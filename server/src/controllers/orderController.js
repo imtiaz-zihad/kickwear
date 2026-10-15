@@ -1,7 +1,9 @@
 // src/controllers/orderController.js
 const Order = require("../models/Order");
+const Product = require("../models/Product");
 const { getCache, setCache, invalidateCache } = require("../utils/cache");
 const { sendSMS, SMS_MESSAGES } = require("../services/smsService");
+const mongoose = require("mongoose");
 
 const CACHE_TTL = {
   ORDER_LIST: 100,
@@ -9,50 +11,229 @@ const CACHE_TTL = {
 };
 
 // ✅ Create order
+// exports.createOrder = async (req, res) => {
+//   try {
+//     const {
+//       customerName,
+//       phone,
+//       address,
+//       items,
+//       totalPrice,
+//       deliveryCharge,
+//       size,
+//     } = req.body;
+
+//     if (!customerName || !phone || !address || !items || !totalPrice) {
+//       return res.status(400).json({ message: "Missing required fields" });
+//     }
+
+//     if (!/^01[3-9]\d{8}$/.test(phone)) {
+//       return res
+//         .status(400)
+//         .json({ message: "Invalid Bangladeshi phone number" });
+//     }
+
+//     if (!Array.isArray(items) || items.length === 0) {
+//       return res
+//         .status(400)
+//         .json({ message: "Order must have at least one item" });
+//     }
+
+//     const order = await Order.create({
+//       customerName,
+//       phone,
+//       address,
+//       items,
+//       totalPrice,
+//       deliveryCharge: deliveryCharge || 0,
+//       size: size || null,
+//     });
+
+//     invalidateCache("orders:");
+//     invalidateCache(`track:${phone}`);
+
+//     res.status(201).json(order);
+//   } catch (err) {
+//     res.status(500).json({ message: err.message });
+//   }
+// };
+
+
 exports.createOrder = async (req, res) => {
   try {
     const {
       customerName,
       phone,
       address,
+      deliveryArea,
       items,
-      totalPrice,
-      deliveryCharge,
-      size,
     } = req.body;
 
-    if (!customerName || !phone || !address || !items || !totalPrice) {
-      return res.status(400).json({ message: "Missing required fields" });
+    // 1. Validate required fields
+    if (
+      !customerName?.trim() ||
+      !phone?.trim() ||
+      !address?.trim() ||
+      !deliveryArea ||
+      !Array.isArray(items) ||
+      items.length === 0
+    ) {
+      return res.status(400).json({
+        message: "Missing required fields",
+      });
     }
 
-    if (!/^01[3-9]\d{8}$/.test(phone)) {
-      return res
-        .status(400)
-        .json({ message: "Invalid Bangladeshi phone number" });
+    const normalizedPhone = phone.trim();
+
+    if (!/^01[3-9]\d{8}$/.test(normalizedPhone)) {
+      return res.status(400).json({
+        message: "Invalid Bangladeshi phone number",
+      });
     }
 
-    if (!Array.isArray(items) || items.length === 0) {
-      return res
-        .status(400)
-        .json({ message: "Order must have at least one item" });
+    if (!["dhaka", "outside"].includes(deliveryArea)) {
+      return res.status(400).json({
+        message: "Invalid delivery area",
+      });
     }
 
+    // 2. Calculate each item using database prices
+    const orderItems = [];
+    let itemsTotal = 0;
+
+    for (const item of items) {
+      const {
+        productId,
+        quantity,
+        size,
+        uclPatch = false,
+        customName,
+        customNumber,
+      } = item;
+
+      if (
+        !productId ||
+        !mongoose.isValidObjectId(productId) ||
+        !Number.isInteger(quantity) ||
+        quantity < 1 ||
+        typeof uclPatch !== "boolean"
+      ) {
+        return res.status(400).json({
+          message: "Invalid product or quantity",
+        });
+      }
+
+      const product = await Product.findById(productId);
+
+      if (!product) {
+        return res.status(404).json({
+          message: "A product in your order was not found",
+        });
+      }
+
+      // 3. Validate stock
+      if (quantity > product.stock) {
+        return res.status(400).json({
+          message: `Insufficient stock for ${product.name}`,
+        });
+      }
+
+      // 4. Validate size
+      if (
+        size &&
+        Array.isArray(product.sizes) &&
+        !product.sizes.includes(size)
+      ) {
+        return res.status(400).json({
+          message: `Invalid size for ${product.name}`,
+        });
+      }
+
+      // 5. Validate optional add-ons
+      const patch = product.addOns?.uclPatch;
+      const printing = product.addOns?.customPrint;
+
+      if (uclPatch && !patch?.enabled) {
+        return res.status(400).json({
+          message: `UCL patch is unavailable for ${product.name}`,
+        });
+      }
+
+      const hasCustomName =
+        typeof customName === "string" && customName.trim() !== "";
+      const hasCustomNumber =
+        customNumber !== null &&
+        customNumber !== undefined &&
+        String(customNumber).trim() !== "";
+
+      if (hasCustomName !== hasCustomNumber) {
+        return res.status(400).json({
+          message: "Custom name and number must be provided together",
+        });
+      }
+
+      const wantsPrinting = hasCustomName && hasCustomNumber;
+
+      if (wantsPrinting && !printing?.enabled) {
+        return res.status(400).json({
+          message: `Custom printing is unavailable for ${product.name}`,
+        });
+      }
+
+      // 6. Use the current selling price from the database
+      const basePrice = product.discountedPrice;
+
+      const patchPrice = uclPatch ? patch.price : 0;
+      const printingPrice = wantsPrinting ? printing.price : 0;
+
+      const addOnsPrice = patchPrice + printingPrice;
+      const finalUnitPrice = basePrice + addOnsPrice;
+
+      orderItems.push({
+        productId: product._id.toString(),
+        name: product.name,
+        image: product.images?.[0] || null,
+        size: size || null,
+        quantity,
+        basePrice,
+        uclPatch,
+        customName: wantsPrinting ? customName.trim() : null,
+        customNumber: wantsPrinting
+          ? String(customNumber).trim()
+          : null,
+        addOnsPrice,
+        price: finalUnitPrice,
+      });
+
+      itemsTotal += finalUnitPrice * quantity;
+    }
+
+    // 7. Calculate delivery and final total on the server
+    const deliveryCharge = deliveryArea === "dhaka" ? 70 : 130;
+    const totalPrice = itemsTotal + deliveryCharge;
+
+    // 8. Save the order
     const order = await Order.create({
-      customerName,
-      phone,
-      address,
-      items,
+      customerName: customerName.trim(),
+      phone: normalizedPhone,
+      address: address.trim(),
+      deliveryArea,
+      items: orderItems,
+      deliveryCharge,
       totalPrice,
-      deliveryCharge: deliveryCharge || 0,
-      size: size || null,
     });
 
+    // 9. Clear relevant caches
     invalidateCache("orders:");
-    invalidateCache(`track:${phone}`);
+    invalidateCache(`track:${normalizedPhone}`);
 
-    res.status(201).json(order);
+    return res.status(201).json(order);
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error("Create Order Error:", err);
+
+    return res.status(500).json({
+      message: "Failed to create order",
+    });
   }
 };
 

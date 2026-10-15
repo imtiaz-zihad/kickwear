@@ -25,7 +25,10 @@ const MAX_QTY = 10;
 
 // Display only. The server recalculates the real prices.
 const DEFAULT_ADDON_PRICE = 200;
-const DELIVERY: Record<DeliveryArea, { label: string; hint: string; charge: number }> = {
+const DELIVERY: Record<
+  DeliveryArea,
+  { label: string; hint: string; charge: number }
+> = {
   dhaka: { label: "Inside Dhaka", hint: "Dhaka city", charge: 70 },
   outside: { label: "Outside Dhaka", hint: "All over Bangladesh", charge: 130 },
 };
@@ -62,7 +65,9 @@ function readStoredOrder(): StoredOrder | null {
       size: str(o.size),
       uclPatch: o.uclPatch === true,
       customName: str(o.customName),
-      customNumber: str(o.customNumber !== null ? String(o.customNumber ?? "") : null),
+      customNumber: str(
+        o.customNumber !== null ? String(o.customNumber ?? "") : null,
+      ),
     };
   } catch {
     return null;
@@ -108,7 +113,11 @@ function Field({
       </label>
       {children}
       {error && (
-        <p id={`${id}-error`} role="alert" className="mt-1.5 text-sm text-red-600">
+        <p
+          id={`${id}-error`}
+          role="alert"
+          className="mt-1.5 text-sm text-red-600"
+        >
           {error}
         </p>
       )}
@@ -124,7 +133,9 @@ const inputClass = (hasError: boolean) =>
 export default function CheckoutPage() {
   const router = useRouter();
 
-  const [loadState, setLoadState] = useState<"loading" | "ready" | "empty" | "error">("loading");
+  const [loadState, setLoadState] = useState<
+    "loading" | "ready" | "empty" | "error"
+  >("loading");
   const [stored, setStored] = useState<StoredOrder | null>(null);
   const [product, setProduct] = useState<Product | null>(null);
 
@@ -145,18 +156,25 @@ export default function CheckoutPage() {
 
     (async () => {
       const order = readStoredOrder();
+
+
+
       if (!order) {
         if (!cancelled) setLoadState("empty");
         return;
       }
 
       try {
+
+
         const p = await getSingleProduct(order.productId);
+
         if (cancelled) return;
         setStored(order);
         setProduct(p);
         setLoadState("ready");
-      } catch {
+      } catch(err) {
+        console.error("5. Product Loading Error:", err);
         if (!cancelled) setLoadState("error");
       }
     })();
@@ -234,7 +252,11 @@ export default function CheckoutPage() {
 
           <div className="space-y-1 rounded-xl bg-secondary/60 p-4 text-left">
             <Line label="Delivery" value={placed.deliveryCharge} />
-            <Line label="Total to pay (Cash on Delivery)" value={placed.totalPrice} strong />
+            <Line
+              label="Total to pay (Cash on Delivery)"
+              value={placed.totalPrice}
+              strong
+            />
           </div>
 
           <div className="flex flex-col gap-3 pt-1">
@@ -259,7 +281,8 @@ export default function CheckoutPage() {
   }
 
   // ── Price breakdown (display only) ───────────────────────────────────────
-  const uclActive = stored.uclPatch && product.addOns?.uclPatch?.enabled === true;
+  const uclActive =
+    stored.uclPatch && product.addOns?.uclPatch?.enabled === true;
   const printActive =
     Boolean(stored.customName || stored.customNumber) &&
     product.addOns?.customPrint?.enabled === true;
@@ -275,7 +298,9 @@ export default function CheckoutPage() {
   const deliveryCharge = DELIVERY[form.deliveryArea].charge;
   const total = subtotal + deliveryCharge;
 
-  const printText = [stored.customName, stored.customNumber].filter(Boolean).join(" ");
+  const printText = [stored.customName, stored.customNumber]
+    .filter(Boolean)
+    .join(" ");
   const outOfStock = product.stock !== undefined && product.stock <= 0;
   const image = product.images?.[0];
 
@@ -299,6 +324,7 @@ export default function CheckoutPage() {
     setSubmitError("");
 
     try {
+
       // Only selections are sent. The server calculates every price.
       const order = await createOrder({
         customerName: form.customerName.trim(),
@@ -325,10 +351,11 @@ export default function CheckoutPage() {
       setPlaced(order);
       window.scrollTo({ top: 0 });
     } catch (err) {
+       console.error("7. Create Order Error:", err);
       setSubmitError(
         err instanceof Error && err.message
           ? err.message
-          : "Could not place your order. Please try again."
+          : "Could not place your order. Please try again.",
       );
     } finally {
       setSubmitting(false);
@@ -347,10 +374,16 @@ export default function CheckoutPage() {
         >
           <ArrowLeft className="h-5 w-5" />
         </button>
-        <h1 className="font-display text-2xl font-bold md:text-3xl">Checkout</h1>
+        <h1 className="font-display text-2xl font-bold md:text-3xl">
+          Checkout
+        </h1>
       </div>
 
-      <form onSubmit={handleSubmit} noValidate className="grid gap-8 lg:grid-cols-5">
+      <form
+        onSubmit={handleSubmit}
+        noValidate
+        className="grid gap-8 lg:grid-cols-5"
+      >
         {/* LEFT: delivery info */}
         <div className="space-y-5 lg:col-span-3">
           <div className="space-y-5 rounded-2xl border border-border/60 bg-card p-5 md:p-6">
@@ -364,7 +397,9 @@ export default function CheckoutPage() {
                 autoComplete="name"
                 placeholder="Your name"
                 value={form.customerName}
-                onChange={(e) => setForm({ ...form, customerName: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, customerName: e.target.value })
+                }
                 aria-invalid={Boolean(errors.customerName)}
                 className={inputClass(Boolean(errors.customerName))}
               />
@@ -380,7 +415,10 @@ export default function CheckoutPage() {
                 placeholder="01XXXXXXXXX"
                 value={form.phone}
                 onChange={(e) =>
-                  setForm({ ...form, phone: e.target.value.replace(/\D/g, "").slice(0, 11) })
+                  setForm({
+                    ...form,
+                    phone: e.target.value.replace(/\D/g, "").slice(0, 11),
+                  })
                 }
                 aria-invalid={Boolean(errors.phone)}
                 className={inputClass(Boolean(errors.phone))}
@@ -402,8 +440,14 @@ export default function CheckoutPage() {
 
             {/* Delivery area */}
             <div>
-              <span className="mb-1.5 block text-sm font-medium">Delivery area</span>
-              <div role="radiogroup" aria-label="Delivery area" className="grid grid-cols-2 gap-3">
+              <span className="mb-1.5 block text-sm font-medium">
+                Delivery area
+              </span>
+              <div
+                role="radiogroup"
+                aria-label="Delivery area"
+                className="grid grid-cols-2 gap-3"
+              >
                 {(Object.keys(DELIVERY) as DeliveryArea[]).map((key) => {
                   const active = form.deliveryArea === key;
                   return (
@@ -440,7 +484,9 @@ export default function CheckoutPage() {
             <Banknote className="h-6 w-6 shrink-0 text-primary" />
             <div>
               <p className="font-semibold">Cash on Delivery</p>
-              <p className="text-sm text-muted-foreground">Pay after receiving your order</p>
+              <p className="text-sm text-muted-foreground">
+                Pay after receiving your order
+              </p>
             </div>
           </div>
         </div>
@@ -499,8 +545,12 @@ export default function CheckoutPage() {
 
           <div className="space-y-2 border-t border-border/60 pt-4">
             <Line label={`Jersey × ${qty}`} value={jerseyTotal} />
-            {uclActive && <Line label={`UCL patch × ${qty}`} value={uclTotal} />}
-            {printActive && <Line label={`Name & number × ${qty}`} value={printTotal} />}
+            {uclActive && (
+              <Line label={`UCL patch × ${qty}`} value={uclTotal} />
+            )}
+            {printActive && (
+              <Line label={`Name & number × ${qty}`} value={printTotal} />
+            )}
             <Line label="Subtotal" value={subtotal} />
             <Line label="Delivery" value={deliveryCharge} />
           </div>
@@ -510,13 +560,19 @@ export default function CheckoutPage() {
           </div>
 
           {outOfStock && (
-            <p role="alert" className="rounded-xl bg-red-500/10 p-3 text-sm text-red-600">
+            <p
+              role="alert"
+              className="rounded-xl bg-red-500/10 p-3 text-sm text-red-600"
+            >
               This product is currently out of stock.
             </p>
           )}
 
           {submitError && (
-            <p role="alert" className="rounded-xl bg-red-500/10 p-3 text-sm text-red-600">
+            <p
+              role="alert"
+              className="rounded-xl bg-red-500/10 p-3 text-sm text-red-600"
+            >
               {submitError}
             </p>
           )}
