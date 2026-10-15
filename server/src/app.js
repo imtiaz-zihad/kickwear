@@ -7,6 +7,9 @@ const rateLimit = require("express-rate-limit"); // ✅ prevent abuse
 const connectDB = require("./config/db");
 const app = express();
 
+// ✅ Render's proxy sits in front of the app (needed for rate limiter to see real IPs)
+app.set("trust proxy", 1);
+
 // ✅ DB connect
 connectDB();
 
@@ -35,33 +38,25 @@ const generalLimiter = rateLimit({
   message: { message: "Too many requests, please try again later." },
 });
 
-
-
-
 app.use("/api/", generalLimiter);
 
-
-// ✅ Health check
+// ✅ Health checks (must be BEFORE the 404 handler)
 app.get("/", (req, res) => {
   res.send("🚀 API is running successfully!");
 });
+
+app.get("/health", (req, res) => res.status(200).json({ ok: true }));
 
 // ✅ Routes
 app.use("/api/products", require("./routes/productRoutes"));
 app.use("/api/orders", require("./routes/orderRoutes"));
 
-// ✅ 404 handler
+// ✅ 404 handler (always after all routes)
 app.use((req, res) => {
   res.status(404).json({ message: "Route not found" });
 });
 
-// app = express(); er thik pore
-app.set("trust proxy", 1); // Render-er proxy-r pichone rate limiter thik kaj korar jonno
-
-// Health check (keep-alive ping)
-app.get("/health", (req, res) => res.status(200).json({ ok: true }));
-
-// ✅ Global error handler
+// ✅ Global error handler (always last)
 app.use((err, req, res, next) => {
   console.error("Unhandled error:", err);
   res.status(500).json({ message: "Internal server error" });
