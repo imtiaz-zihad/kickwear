@@ -23,7 +23,7 @@ app.use(
       "http://localhost:3000",
       "https://www.sbcollectionbd.com",
       "https://sbcollectionbd.com",
-      "https://e-frontend-lemon.vercel.app",
+      "https://kickwear-seven.vercel.app"
     ],
     credentials: true,
   })
