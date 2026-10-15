@@ -3,7 +3,13 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { LayoutDashboard, Package, ShoppingCart, Store, LogOut } from "lucide-react";
+import { LayoutDashboard, LogOut, Package, ShoppingCart, Store } from "lucide-react";
+
+const MENU = [
+  { name: "Dashboard", path: "/admin/dashboard", icon: LayoutDashboard },
+  { name: "Products", path: "/admin/products", icon: Package },
+  { name: "Orders", path: "/admin/orders", icon: ShoppingCart },
+];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const path = usePathname();
@@ -11,222 +17,87 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [authorized, setAuthorized] = useState(false);
 
   useEffect(() => {
-    const admin = localStorage.getItem("admin");
-    if (!admin) {
-      router.push("/login");
+    if (!localStorage.getItem("admin")) {
+      router.replace("/login");
     } else {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setAuthorized(true);
     }
   }, [router]);
 
-  if (!authorized) return null;
-
-  const menu = [
-    { name: "Dashboard", path: "/admin/dashboard", icon: LayoutDashboard },
-    { name: "Products", path: "/admin/products", icon: Package },
-    { name: "Orders", path: "/admin/orders", icon: ShoppingCart },
-  ];
-
   const handleLogout = () => {
     localStorage.removeItem("admin");
-    router.push("/login");
+    localStorage.removeItem("adminToken");
+    router.replace("/login");
   };
 
-  return (
-    <div
-      style={{
-        display: "flex",
-        minHeight: "100vh",
-        background: "#f4f4f0",
-        fontFamily: "sans-serif",
-      }}
-    >
-      {/* SIDEBAR */}
-      <div
-        style={{
-          width: "240px",
-          flexShrink: 0,
-          background: "#111",
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "space-between",
-          boxShadow: "4px 0 24px rgba(0,0,0,0.15)",
-          position: "sticky",
-          top: 0,
-          height: "100vh",
-        }}
-      >
-        {/* Top: Logo + Nav */}
-        <div style={{ padding: "32px 20px 24px" }}>
-          {/* Brand */}
-          <div style={{ marginBottom: "36px", paddingLeft: "4px" }}>
-            <span
-              style={{
-                fontSize: "17px",
-                fontWeight: "700",
-                color: "#f5f5f5",
-                letterSpacing: "-0.3px",
-                fontFamily: "Georgia, serif",
-              }}
-            >
-              Kick{" "}
-            </span>
-            <span
-              style={{
-                fontSize: "17px",
-                fontWeight: "700",
-                color: "#f97316",
-                fontFamily: "Georgia, serif",
-              }}
-            >
-              Wear
-            </span>
+  if (!authorized) return null;
 
-            <div
-              style={{
-                marginTop: "6px",
-                height: "2px",
-                width: "32px",
-                background: "linear-gradient(90deg, #f97316, transparent)",
-                borderRadius: "2px",
-              }}
-            />
+  return (
+    <div className="flex min-h-screen flex-col bg-secondary/40 md:flex-row">
+      {/* SIDEBAR (top bar on mobile) */}
+      <aside className="flex shrink-0 flex-col bg-neutral-950 text-white md:sticky md:top-0 md:h-screen md:w-60 md:justify-between">
+        <div className="p-4 md:p-5 md:pt-8">
+          <div className="mb-4 md:mb-9 md:pl-1">
+            <span className="font-display text-lg font-bold">Kick </span>
+            <span className="font-display text-lg font-bold text-primary">Wear</span>
+            <div className="mt-1.5 hidden h-0.5 w-8 rounded bg-linear-to-r from-primary to-transparent md:block" />
           </div>
 
-          {/* Nav label */}
-          <p
-            style={{
-              fontSize: "10px",
-              fontWeight: "600",
-              color: "rgba(255,255,255,0.25)",
-              letterSpacing: "1.2px",
-              textTransform: "uppercase",
-              marginBottom: "12px",
-              paddingLeft: "8px",
-            }}
-          >
+          <p className="mb-3 hidden pl-2 text-[10px] font-semibold uppercase tracking-widest text-white/25 md:block">
             Navigation
           </p>
 
-          {/* Menu items */}
-          <nav style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-            {menu.map((item) => {
-              const Icon = item.icon;
-              const active = path.includes(item.path);
+          <nav className="flex gap-1 md:flex-col">
+            {MENU.map(({ name, path: href, icon: Icon }) => {
+              const active = path.startsWith(href);
               return (
-                <Link key={item.name} href={item.path} style={{ textDecoration: "none" }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "12px",
-                      padding: "11px 12px",
-                      borderRadius: "10px",
-                      cursor: "pointer",
-                      transition: "all 0.15s",
-                      background: active
-                        ? "linear-gradient(135deg, #f97316, #ea580c)"
-                        : "transparent",
-                      color: active ? "#fff" : "rgba(255,255,255,0.45)",
-                      boxShadow: active ? "0 4px 16px rgba(249,115,22,0.3)" : "none",
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!active) {
-                        (e.currentTarget as HTMLDivElement).style.background =
-                          "rgba(255,255,255,0.06)";
-                        (e.currentTarget as HTMLDivElement).style.color =
-                          "rgba(255,255,255,0.75)";
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!active) {
-                        (e.currentTarget as HTMLDivElement).style.background = "transparent";
-                        (e.currentTarget as HTMLDivElement).style.color =
-                          "rgba(255,255,255,0.45)";
-                      }
-                    }}
-                  >
-                    <Icon size={16} />
-                    <span style={{ fontSize: "13px", fontWeight: "500" }}>{item.name}</span>
-                  </div>
+                <Link
+                  key={href}
+                  href={href}
+                  className={`flex flex-1 items-center justify-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors md:flex-none md:justify-start ${
+                    active
+                      ? "bg-primary text-primary-foreground shadow-lg shadow-primary/30"
+                      : "text-white/45 hover:bg-white/5 hover:text-white/80"
+                  }`}
+                >
+                  <Icon size={16} />
+                  {name}
                 </Link>
               );
             })}
           </nav>
         </div>
 
-        {/* Bottom: Store + Logout */}
-        <div
-          style={{
-            padding: "20px",
-            borderTop: "1px solid rgba(255,255,255,0.06)",
-            display: "flex",
-            flexDirection: "column",
-            gap: "2px",
-          }}
-        >
-          <Link href="/" style={{ textDecoration: "none" }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "10px",
-                padding: "10px 12px",
-                borderRadius: "10px",
-                color: "rgba(255,255,255,0.35)",
-                fontSize: "13px",
-                cursor: "pointer",
-                transition: "all 0.15s",
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLDivElement).style.background =
-                  "rgba(255,255,255,0.06)";
-                (e.currentTarget as HTMLDivElement).style.color = "rgba(255,255,255,0.7)";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLDivElement).style.background = "transparent";
-                (e.currentTarget as HTMLDivElement).style.color = "rgba(255,255,255,0.35)";
-              }}
-            >
-              <Store size={15} />
-              <span>Visit Store</span>
-            </div>
-          </Link>
-
-          <div
-            onClick={handleLogout}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "10px",
-              padding: "10px 12px",
-              borderRadius: "10px",
-              color: "rgba(255,255,255,0.35)",
-              fontSize: "13px",
-              cursor: "pointer",
-              transition: "all 0.15s",
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLDivElement).style.background =
-                "rgba(239,68,68,0.1)";
-              (e.currentTarget as HTMLDivElement).style.color = "#f87171";
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLDivElement).style.background = "transparent";
-              (e.currentTarget as HTMLDivElement).style.color = "rgba(255,255,255,0.35)";
-            }}
+        {/* Desktop bottom links */}
+        <div className="hidden flex-col gap-0.5 border-t border-white/5 p-5 md:flex">
+          <Link
+            href="/"
+            className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm text-white/40 transition-colors hover:bg-white/5 hover:text-white/70"
           >
-            <LogOut size={15} />
-            <span>Logout</span>
-          </div>
+            <Store size={15} /> Visit Store
+          </Link>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm text-white/40 transition-colors hover:bg-red-500/10 hover:text-red-400"
+          >
+            <LogOut size={15} /> Logout
+          </button>
         </div>
-      </div>
 
-      {/* MAIN CONTENT */}
-      <div style={{ flex: 1, padding: "36px", overflow: "auto" }}>
-        {children}
-      </div>
+        {/* Mobile logout */}
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="flex items-center justify-center gap-2 border-t border-white/5 py-2.5 text-sm text-white/50 md:hidden"
+        >
+          <LogOut size={14} /> Logout
+        </button>
+      </aside>
+
+      {/* MAIN */}
+      <main className="min-w-0 flex-1 p-4 md:p-8">{children}</main>
     </div>
   );
 }
