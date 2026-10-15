@@ -55,6 +55,12 @@ app.use((req, res) => {
   res.status(404).json({ message: "Route not found" });
 });
 
+// app = express(); er thik pore
+app.set("trust proxy", 1); // Render-er proxy-r pichone rate limiter thik kaj korar jonno
+
+// Health check (keep-alive ping)
+app.get("/health", (req, res) => res.status(200).json({ ok: true }));
+
 // ✅ Global error handler
 app.use((err, req, res, next) => {
   console.error("Unhandled error:", err);
