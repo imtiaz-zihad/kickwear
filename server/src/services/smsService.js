@@ -21,7 +21,7 @@ const sendSMS = async (phone, message) => {
 
 const SMS_MESSAGES = {
   Confirmed: (name, total, phone) =>
-    `প্রিয় ${name},\n\nআপনার ${total} টাকার অর্ডারটি নিশ্চিত হয়েছে। শীঘ্রই ডেলিভারি দেওয়া হবে।\n\nঅর্ডার ট্র্যাক করুন:\nhttps://kickwear-seven.vercel.app/track-order \n\nধন্যবাদ\nKickwear`,
+    `প্রিয় ${name},\n\nআপনার ${total} টাকার অর্ডারটি নিশ্চিত হয়েছে। শীঘ্রই ডেলিভারি দেওয়া হবে।\n\nঅর্ডার ট্র্যাক করুন:\nhttps://www.kickwear.shop/track-order \n\nধন্যবাদ\nKickwear`,
 };
 
 module.exports = { sendSMS, SMS_MESSAGES };
