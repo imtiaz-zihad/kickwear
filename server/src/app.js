@@ -21,8 +21,8 @@ app.use(
   cors({
     origin: [
       "http://localhost:3000",
-      "https://www.sbcollectionbd.com",
-      "https://sbcollectionbd.com",
+      "https://kickwear.shop",
+      "https://www.kickwear.shop",
       "https://kickwear-seven.vercel.app"
     ],
     credentials: true,
