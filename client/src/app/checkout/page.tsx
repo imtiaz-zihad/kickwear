@@ -19,6 +19,7 @@ import {
   type Order,
 } from "@/services/api";
 import type { Product } from "@/types/product";
+import { track, getMetaIds } from "@/lib/fbpixel";
 
 const BD_PHONE_REGEX = /^01[3-9]\d{8}$/;
 const MAX_QTY = 10;
@@ -157,23 +158,28 @@ export default function CheckoutPage() {
     (async () => {
       const order = readStoredOrder();
 
-
-
       if (!order) {
         if (!cancelled) setLoadState("empty");
         return;
       }
 
       try {
-
-
         const p = await getSingleProduct(order.productId);
 
         if (cancelled) return;
         setStored(order);
         setProduct(p);
         setLoadState("ready");
-      } catch(err) {
+
+        track("InitiateCheckout", {
+          content_ids: [p._id],
+          content_name: p.name,
+          content_type: "product",
+          value: p.discountedPrice * order.quantity,
+          currency: "BDT",
+          num_items: order.quantity,
+        });
+      } catch (err) {
         console.error("5. Product Loading Error:", err);
         if (!cancelled) setLoadState("error");
       }
@@ -324,7 +330,6 @@ export default function CheckoutPage() {
     setSubmitError("");
 
     try {
-
       // Only selections are sent. The server calculates every price.
       const order = await createOrder({
         customerName: form.customerName.trim(),
@@ -341,6 +346,7 @@ export default function CheckoutPage() {
             customNumber: printActive ? stored.customNumber : null,
           },
         ],
+        meta: getMetaIds(),
       });
 
       try {
@@ -349,9 +355,22 @@ export default function CheckoutPage() {
         /* ignore */
       }
       setPlaced(order);
+
+      track(
+        "Purchase",
+        {
+          value: order.totalPrice,
+          currency: "BDT",
+          content_ids: order.items.map((i) => i.productId),
+          content_type: "product",
+          num_items: order.items.reduce((sum, i) => sum + i.quantity, 0),
+        },
+        order._id, // same id the server sends → Meta de-duplicates
+      );
+
       window.scrollTo({ top: 0 });
     } catch (err) {
-       console.error("7. Create Order Error:", err);
+      console.error("7. Create Order Error:", err);
       setSubmitError(
         err instanceof Error && err.message
           ? err.message

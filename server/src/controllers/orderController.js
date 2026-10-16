@@ -227,6 +227,9 @@ exports.createOrder = async (req, res) => {
     invalidateCache("orders:");
     invalidateCache(`track:${normalizedPhone}`);
 
+    // 10. Send Purchase to Meta (server-side). No await: it must never slow or break the order.
+    sendPurchase(order, req);
+
     return res.status(201).json(order);
   } catch (err) {
     console.error("Create Order Error:", err);

@@ -6,6 +6,7 @@ import { getSingleProduct } from "@/services/api";
 import { Product, Sleeve } from "@/types/product";
 import OrderButton from "@/components/Common/OrderButton";
 import ProductImageCarousel from "@/components/Product/ProductImageCarousel";
+import ViewContentTracker from "@/components/Product/ViewContentTracker";
 
 const SLEEVE_LABEL: Record<Sleeve, string> = {
   half: "Half Sleeve",
@@ -78,6 +79,7 @@ export default async function ProductDetails({
 
   return (
     <div className="mx-auto max-w-7xl px-6 py-6">
+      <ViewContentTracker product={product} />
       {/* Breadcrumb */}
       <nav
         aria-label="Breadcrumb"

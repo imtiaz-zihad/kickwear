@@ -6,6 +6,7 @@ import { Check, Phone, ShoppingBag } from "lucide-react";
 import QuantitySelector from "./QuantitySelector";
 import SizeChart, { SIZE_CHART } from "./SizeChart";
 import type { ProductAddOns } from "@/types/product";
+import { track } from "@/lib/fbpixel";
 
 // Mirrors the backend default. The backend recalculates the real price.
 const DEFAULT_ADDON_PRICE = 200;
@@ -168,7 +169,7 @@ export default function OrderButton({
           uclPatch: uclActive,
           customName: name || null,
           customNumber: number || null,
-        })
+        }),
       );
     } catch {
       setErrors({
@@ -177,6 +178,15 @@ export default function OrderButton({
       });
       return;
     }
+
+    track("AddToCart", {
+      content_ids: [productId],
+      content_name: productName,
+      content_type: "product",
+      value: total,
+      currency: "BDT",
+      num_items: quantity,
+    });
 
     router.push("/checkout");
   };
@@ -241,7 +251,9 @@ export default function OrderButton({
         <div className="space-y-2">
           <span className="block text-sm font-semibold">
             Customize{" "}
-            <span className="font-normal text-muted-foreground">(optional)</span>
+            <span className="font-normal text-muted-foreground">
+              (optional)
+            </span>
           </span>
 
           <div
@@ -295,7 +307,7 @@ export default function OrderButton({
                         e.target.value
                           .toUpperCase()
                           .replace(/[^A-Z .'-]/g, "")
-                          .slice(0, 12)
+                          .slice(0, 12),
                       )
                     }
                     className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm uppercase tracking-wide focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
@@ -316,7 +328,9 @@ export default function OrderButton({
                     autoComplete="off"
                     placeholder="10"
                     onChange={(e) =>
-                      setCustomNumber(e.target.value.replace(/\D/g, "").slice(0, 2))
+                      setCustomNumber(
+                        e.target.value.replace(/\D/g, "").slice(0, 2),
+                      )
                     }
                     className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   />
@@ -349,6 +363,7 @@ export default function OrderButton({
           <div className="ml-auto flex items-center gap-2">
             <a
               href={whatsappHref}
+              onClick={() => track("Contact", { content_name: productName })}
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Order on WhatsApp"
@@ -360,6 +375,7 @@ export default function OrderButton({
 
             <a
               href={callHref}
+              onClick={() => track("Contact", { content_name: productName })}
               aria-label="Call us"
               className="flex h-11 items-center justify-center gap-2 rounded-xl border border-border px-3 text-sm font-semibold text-foreground transition-colors hover:bg-secondary sm:px-4"
             >
@@ -377,7 +393,10 @@ export default function OrderButton({
           <Row label={`UCL patch × ${quantity}`} value={uclPrice * quantity} />
         )}
         {printActive && (
-          <Row label={`Name & number × ${quantity}`} value={printPrice * quantity} />
+          <Row
+            label={`Name & number × ${quantity}`}
+            value={printPrice * quantity}
+          />
         )}
         <div className="flex justify-between border-t border-border/60 pt-2 text-base font-bold">
           <span>Total</span>
