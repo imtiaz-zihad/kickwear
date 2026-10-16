@@ -15,10 +15,10 @@ import {
 import { useState } from "react";
 import { Button } from "../ui/button";
 
-//const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER;
+// WhatsApp number
 const WHATSAPP_NUMBER = "8801894302115";
 
-// Keep slugs in sync with CategorySection and your DB category values
+// Navigation categories
 const NAV_CATEGORIES = [
   { name: "Club Jersey", slug: "club-jersey", icon: ShieldCheck },
   { name: "Country Jersey", slug: "country-jersey", icon: Globe },
@@ -26,6 +26,7 @@ const NAV_CATEGORIES = [
   { name: "Jacket", slug: "jacket", icon: Shirt },
 ];
 
+// WhatsApp Icon
 const WhatsAppIcon = ({ className = "h-4 w-4" }: { className?: string }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -44,13 +45,13 @@ const Navbar = () => {
   const isActive = (path: string) => pathname.startsWith(path);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border/50 bg-background/70 backdrop-blur-xl">
-      <div className="container flex h-20 items-center justify-between px-4 md:h-24 md:px-6">
-        {/* LEFT - Logo */}
-        {/* LEFT - Logo */}
+    <header className="sticky top-0 z-50 border-b border-border/50 bg-background/90 backdrop-blur-xl">
+      {/* TOP NAVBAR */}
+      <div className="container flex h-14 items-center justify-between px-4 md:h-24 md:px-6">
+        {/* LOGO */}
         <Link
           href="/"
-          className="flex items-center"
+          className="flex shrink-0 items-center"
           aria-label="Kick Wear home"
         >
           <Image
@@ -59,17 +60,19 @@ const Navbar = () => {
             width={80}
             height={80}
             priority
-            className="h-12 w-12 object-contain md:h-20 md:w-20"
+            className="h-11 w-11 object-contain md:h-20 md:w-20"
           />
-          <span className="-ml-1 font-display text-2xl font-extrabold leading-none tracking-tight text-foreground md:-ml-2 md:text-3xl">
+
+          <span className="-ml-1 whitespace-nowrap font-display text-2xl font-extrabold leading-none tracking-tight text-foreground md:-ml-2 md:text-3xl">
             Kick <span className="gradient-text">Wear</span>
           </span>
         </Link>
 
-        {/* CENTER - Categories (desktop) */}
+        {/* DESKTOP CATEGORIES */}
         <nav className="hidden items-center gap-1 lg:flex">
           {NAV_CATEGORIES.map(({ name, slug }) => {
             const href = `/category/${slug}`;
+
             return (
               <Link
                 key={slug}
@@ -86,9 +89,9 @@ const Navbar = () => {
           })}
         </nav>
 
-        {/* RIGHT */}
-        <div className="flex items-center gap-2">
-          {/* WhatsApp Button */}
+        {/* RIGHT SIDE */}
+        <div className="flex shrink-0 items-center gap-2">
+          {/* WHATSAPP - DESKTOP */}
           <a
             href={`https://wa.me/${WHATSAPP_NUMBER}`}
             target="_blank"
@@ -99,7 +102,7 @@ const Navbar = () => {
             WhatsApp
           </a>
 
-          {/* Track Order */}
+          {/* TRACK ORDER - DESKTOP */}
           <Link
             href="/track-order"
             className={`hidden items-center gap-1.5 rounded-full px-5 py-2.5 text-base font-medium transition-all duration-200 lg:flex ${
@@ -108,14 +111,15 @@ const Navbar = () => {
                 : "text-muted-foreground hover:bg-secondary hover:text-foreground"
             }`}
           >
-            <MapPin className="h-4 w-4" /> Track Order
+            <MapPin className="h-4 w-4" />
+            Track Order
           </Link>
 
-          {/* Mobile Menu Button */}
+          {/* MOBILE MENU BUTTON */}
           <Button
             variant="ghost"
             size="icon"
-            className="h-11 w-11 rounded-full lg:hidden"
+            className="h-10 w-10 rounded-full lg:hidden"
             aria-label={mobileOpen ? "Close menu" : "Open menu"}
             aria-expanded={mobileOpen}
             onClick={() => setMobileOpen(!mobileOpen)}
@@ -129,11 +133,36 @@ const Navbar = () => {
         </div>
       </div>
 
-      {/* MOBILE NAV */}
+      {/* MOBILE CATEGORY BAR - BELOW LOGO */}
+      <nav
+        aria-label="Product categories"
+        className="flex items-center gap-2 overflow-x-auto px-5 pb-2 pt-0 lg:hidden scrollbar-hide"
+      >
+        {NAV_CATEGORIES.map(({ name, slug }) => {
+          const href = `/category/${slug}`;
+
+          return (
+            <Link
+              key={slug}
+              href={href}
+              className={`shrink-0 whitespace-nowrap rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
+                isActive(href)
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-background text-foreground hover:bg-secondary"
+              }`}
+            >
+              {name}
+            </Link>
+          );
+        })}
+      </nav>
+
+      {/* MOBILE MENU */}
       {mobileOpen && (
-        <nav className="flex flex-col gap-1 border-t bg-background/95 p-4 backdrop-blur-xl lg:hidden">
+        <nav className="flex flex-col gap-1 border-t border-border/50 bg-background/95 p-4 backdrop-blur-xl lg:hidden">
           {NAV_CATEGORIES.map(({ name, slug, icon: Icon }) => {
             const href = `/category/${slug}`;
+
             return (
               <Link
                 key={slug}
@@ -145,29 +174,32 @@ const Navbar = () => {
                     : "text-muted-foreground hover:bg-secondary hover:text-foreground"
                 }`}
               >
-                <Icon className="h-5 w-5" /> {name}
+                <Icon className="h-5 w-5" />
+                {name}
               </Link>
             );
           })}
 
-          {/* WhatsApp in mobile menu */}
+          {/* WHATSAPP - MOBILE */}
           <a
             href={`https://wa.me/${WHATSAPP_NUMBER}`}
             target="_blank"
             rel="noopener noreferrer"
             onClick={() => setMobileOpen(false)}
-            className="flex items-center gap-2 rounded-xl px-4 py-3 text-base font-medium text-green-600 transition-colors hover:bg-green-50 hover:text-green-700"
+            className="flex items-center gap-2 rounded-xl px-4 py-3 text-base font-medium text-green-600 transition-colors hover:bg-green-50"
           >
             <WhatsAppIcon className="h-5 w-5" />
             WhatsApp
           </a>
 
+          {/* TRACK ORDER - MOBILE */}
           <Link
             href="/track-order"
             onClick={() => setMobileOpen(false)}
             className="flex items-center gap-2 rounded-xl px-4 py-3 text-base font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
           >
-            <MapPin className="h-5 w-5" /> Track Order
+            <MapPin className="h-5 w-5" />
+            Track Order
           </Link>
         </nav>
       )}

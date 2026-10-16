@@ -73,10 +73,10 @@ export default async function CategoryPage({ params }: Props) {
       {/* ── Header ── */}
       <div className="bg-linear-to-b from-secondary/50 to-background border-b">
         <div className="container py-2 md:py-2">
-          <h1 className="font-display text-3xl md:text-5xl font-extrabold mb-3">
-            {title}
+          <h1 className="font-display text-2xl md:text-5xl font-extrabold mb-3">
+            {title} 
           </h1>
-          <p className="text-muted-foreground">{description}</p>
+          <p className="text-muted-foreground text-sm md:text-xl">{description}</p>
         </div>
       </div>
 

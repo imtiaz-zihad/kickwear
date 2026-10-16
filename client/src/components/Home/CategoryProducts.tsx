@@ -37,7 +37,7 @@ export default async function CategoryProducts({
             className="flex items-center gap-3 font-display text-2xl font-bold md:text-3xl"
           >
             <span className="h-7 w-1.5 rounded-full bg-primary" aria-hidden />
-            {title}
+            {title}  
           </h2>
 
           <Link

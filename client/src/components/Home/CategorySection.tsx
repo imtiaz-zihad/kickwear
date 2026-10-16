@@ -16,18 +16,18 @@ const categories: Category[] = [
     id: "1",
     name: "Club Jersey",
     slug: "club-jersey",
-    count: 28,
+    count: 22,
     icon: ShieldCheck,
   },
   {
     id: "2",
     name: "Country Jersey",
     slug: "country-jersey",
-    count: 8,
+    count: 6,
     icon: Globe,
   },
-  { id: "3", name: "Retro", slug: "retro", count: 8, icon: History },
-  { id: "4", name: "Jacket", slug: "jacket", count: 4, icon: Shirt },
+  { id: "3", name: "Retro", slug: "retro", count: 10, icon: History },
+  { id: "4", name: "Jacket", slug: "jacket", count: 3, icon: Shirt },
 ];
 
 export default function CategorySection() {
