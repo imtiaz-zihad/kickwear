@@ -8,9 +8,23 @@ declare global {
 export const PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID;
 
 export function track(event: string, data?: Record<string, unknown>, eventId?: string) {
-  if (typeof window === "undefined" || !window.fbq) return;
-  if (eventId) window.fbq("track", event, data ?? {}, { eventID: eventId });
-  else window.fbq("track", event, data ?? {});
+  if (typeof window === "undefined") return;
+
+  const fire = () => {
+    if (!window.fbq) return false;
+    if (eventId) window.fbq("track", event, data ?? {}, { eventID: eventId });
+    else window.fbq("track", event, data ?? {});
+    return true;
+  };
+
+  if (fire()) return;
+
+  // The pixel script loads after hydration. If this runs first (e.g. ViewContent
+  // on a landing page), retry for up to 5 seconds instead of dropping the event.
+  let tries = 0;
+  const timer = setInterval(() => {
+    if (fire() || ++tries >= 50) clearInterval(timer);
+  }, 100);
 }
 
 type P = { _id: string; name: string; discountedPrice: number };
