@@ -1,10 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Loader2, Lock } from "lucide-react";
 
-const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "baborsbcollection7575bd";
+// Set NEXT_PUBLIC_ADMIN_PASSWORD in Vercel (and in client/.env.local for local dev)
+const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD;
 
 export default function AdminLogin() {
   const router = useRouter();
@@ -13,257 +16,132 @@ export default function AdminLogin() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = () => {
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (loading) return;
+
     if (!password.trim()) {
       setError("Please enter your password.");
       return;
     }
+
     setLoading(true);
     setError("");
 
     setTimeout(() => {
-      if (password === ADMIN_PASSWORD) {
-        localStorage.setItem("admin", "true");
+      if (ADMIN_PASSWORD && password === ADMIN_PASSWORD) {
+        try {
+          localStorage.setItem("admin", "true");
+        } catch {
+          setError("Could not sign in. Please enable browser storage.");
+          setLoading(false);
+          return;
+        }
         router.push("/admin/dashboard");
-      } else {
-        setError("Incorrect password. Please try again.");
-        setPassword("");
+        return; // keep the loading state while navigating
       }
+
+      setError("Incorrect password. Please try again.");
+      setPassword("");
       setLoading(false);
     }, 400);
   };
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center px-4"
-      style={{
-        background: "linear-gradient(135deg, #0f0f0f 0%, #1a1a1a 50%, #111 100%)",
-        fontFamily: "'Georgia', 'Times New Roman', serif",
-      }}
-    >
-      {/* Subtle background pattern */}
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-secondary/40 px-4 py-10">
+      {/* soft background glow */}
       <div
-        style={{
-          position: "fixed",
-          inset: 0,
-          backgroundImage:
-            "radial-gradient(circle at 20% 50%, rgba(249,115,22,0.04) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(249,115,22,0.03) 0%, transparent 40%)",
-          pointerEvents: "none",
-        }}
+        aria-hidden="true"
+        className="pointer-events-none absolute -top-40 left-1/2 h-[28rem] w-[28rem] -translate-x-1/2 rounded-full bg-primary/10 blur-3xl"
       />
 
-      <div
-        style={{
-          width: "100%",
-          maxWidth: "400px",
-          position: "relative",
-        }}
-      >
-        {/* Card */}
-        <div
-          style={{
-            background: "rgba(255,255,255,0.03)",
-            border: "1px solid rgba(255,255,255,0.08)",
-            borderRadius: "20px",
-            padding: "48px 40px",
-            backdropFilter: "blur(12px)",
-            boxShadow: "0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(249,115,22,0.05)",
-          }}
-        >
+      <div className="relative w-full max-w-md">
+        <div className="rounded-3xl border border-border/60 bg-card p-7 shadow-xl sm:p-10">
           {/* Brand */}
-          <div style={{ textAlign: "center", marginBottom: "40px" }}>
-            <div
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: "56px",
-                height: "56px",
-                background: "linear-gradient(135deg, #f97316, #ea580c)",
-                borderRadius: "16px",
-                marginBottom: "20px",
-                boxShadow: "0 8px 24px rgba(249,115,22,0.35)",
-              }}
-            >
-              {/* Lock icon SVG */}
-              <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth={2}>
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-              </svg>
+          <div className="mb-8 text-center">
+            <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border border-border/60 bg-background shadow-sm">
+              <Image
+                src="/logo.png"
+                alt="Kick Wear"
+                width={80}
+                height={80}
+                priority
+                className="h-full w-full object-cover"
+              />
             </div>
 
-            <h1
-              style={{
-                fontSize: "22px",
-                fontWeight: "700",
-                color: "#f5f5f5",
-                letterSpacing: "-0.3px",
-                marginBottom: "6px",
-              }}
-            >
-              Admin Portal
+            <h1 className="font-display text-2xl font-bold tracking-tight">
+              Kick <span className="text-primary">Wear</span>
             </h1>
-            <p
-              style={{
-                fontSize: "13px",
-                color: "rgba(255,255,255,0.35)",
-                letterSpacing: "0.5px",
-                textTransform: "uppercase",
-                fontFamily: "sans-serif",
-              }}
-            >
-              SB Collection BD
+            <p className="mt-1 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+              Admin Portal
             </p>
           </div>
 
-          {/* Divider */}
-          <div
-            style={{
-              height: "1px",
-              background: "rgba(255,255,255,0.06)",
-              marginBottom: "32px",
-            }}
-          />
+          <form onSubmit={handleLogin} noValidate className="space-y-5">
+            <div>
+              <label htmlFor="admin-password" className="mb-1.5 block text-sm font-medium">
+                Password
+              </label>
 
-          {/* Password Field */}
-          <div style={{ marginBottom: "24px" }}>
-            <label
-              style={{
-                display: "block",
-                fontSize: "11px",
-                fontWeight: "600",
-                color: "rgba(255,255,255,0.4)",
-                letterSpacing: "1px",
-                textTransform: "uppercase",
-                marginBottom: "10px",
-                fontFamily: "sans-serif",
-              }}
-            >
-              Password
-            </label>
-            <div style={{ position: "relative" }}>
-              <input
-                type={showPassword ? "text" : "password"}
-                placeholder="Enter your password"
-                value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value);
-                  setError("");
-                }}
-                onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-                style={{
-                  width: "100%",
-                  padding: "14px 48px 14px 16px",
-                  background: "rgba(255,255,255,0.05)",
-                  border: error
-                    ? "1px solid rgba(239,68,68,0.6)"
-                    : "1px solid rgba(255,255,255,0.1)",
-                  borderRadius: "12px",
-                  color: "#f5f5f5",
-                  fontSize: "14px",
-                  outline: "none",
-                  fontFamily: "sans-serif",
-                  boxSizing: "border-box",
-                  transition: "border-color 0.2s, background 0.2s",
-                }}
-                onFocus={(e) => {
-                  if (!error) e.target.style.borderColor = "rgba(249,115,22,0.5)";
-                  e.target.style.background = "rgba(255,255,255,0.07)";
-                }}
-                onBlur={(e) => {
-                  if (!error) e.target.style.borderColor = "rgba(255,255,255,0.1)";
-                  e.target.style.background = "rgba(255,255,255,0.05)";
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((v) => !v)}
-                style={{
-                  position: "absolute",
-                  right: "14px",
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  background: "none",
-                  border: "none",
-                  color: "rgba(255,255,255,0.3)",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  padding: 0,
-                  transition: "color 0.2s",
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.6)")}
-                onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.3)")}
-              >
-                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
+              <div className="relative">
+                <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  id="admin-password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  autoFocus
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    setError("");
+                  }}
+                  aria-invalid={Boolean(error)}
+                  aria-describedby={error ? "admin-password-error" : undefined}
+                  className={`h-12 w-full rounded-xl border bg-background pl-10 pr-12 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary ${
+                    error ? "border-red-500" : "border-border"
+                  }`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+
+              {error && (
+                <p id="admin-password-error" role="alert" className="mt-2 text-sm text-red-600">
+                  {error}
+                </p>
+              )}
             </div>
 
-            {error && (
-              <p
-                style={{
-                  color: "#f87171",
-                  fontSize: "12px",
-                  marginTop: "8px",
-                  fontFamily: "sans-serif",
-                }}
-              >
-                {error}
-              </p>
-            )}
-          </div>
-
-          {/* Submit Button */}
-          <button
-            onClick={handleLogin}
-            disabled={loading}
-            style={{
-              width: "100%",
-              padding: "14px",
-              background: loading
-                ? "rgba(249,115,22,0.4)"
-                : "linear-gradient(135deg, #f97316, #ea580c)",
-              border: "none",
-              borderRadius: "12px",
-              color: "white",
-              fontSize: "14px",
-              fontWeight: "600",
-              cursor: loading ? "not-allowed" : "pointer",
-              fontFamily: "sans-serif",
-              letterSpacing: "0.2px",
-              boxShadow: loading ? "none" : "0 4px 20px rgba(249,115,22,0.3)",
-              transition: "all 0.2s",
-            }}
-            onMouseEnter={(e) => {
-              if (!loading) {
-                (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-1px)";
-                (e.currentTarget as HTMLButtonElement).style.boxShadow =
-                  "0 8px 28px rgba(249,115,22,0.4)";
-              }
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)";
-              (e.currentTarget as HTMLButtonElement).style.boxShadow =
-                "0 4px 20px rgba(249,115,22,0.3)";
-            }}
-          >
-            {loading ? "Verifying..." : "Sign In"}
-          </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" /> Verifying…
+                </>
+              ) : (
+                "Sign In"
+              )}
+            </button>
+          </form>
         </div>
 
-        {/* Footer note */}
-        <p
-          style={{
-            textAlign: "center",
-            marginTop: "24px",
-            fontSize: "11px",
-            color: "rgba(255,255,255,0.2)",
-            fontFamily: "sans-serif",
-            letterSpacing: "0.3px",
-          }}
-        >
-          Authorized personnel only
-        </p>
+        <div className="mt-6 flex flex-col items-center gap-2 text-xs text-muted-foreground">
+          <Link href="/" className="inline-flex items-center gap-1.5 font-medium hover:text-foreground">
+            <ArrowLeft className="h-3.5 w-3.5" /> Back to store
+          </Link>
+          <p>Authorized personnel only</p>
+        </div>
       </div>
     </div>
   );
