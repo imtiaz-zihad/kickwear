@@ -84,6 +84,7 @@ export type CreateOrderPayload = {
   address: string;
   deliveryArea: DeliveryArea;
   items: OrderItemInput[];
+  meta?: { fbp?: string; fbc?: string; sourceUrl?: string };
 };
 
 export type GetOrdersResult = {
