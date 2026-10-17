@@ -4,6 +4,7 @@ const Product = require("../models/Product");
 const { getCache, setCache, invalidateCache } = require("../utils/cache");
 const { sendSMS, SMS_MESSAGES } = require("../services/smsService");
 const mongoose = require("mongoose");
+const { sendPurchase } = require("../services/metaCapi");
 
 const CACHE_TTL = {
   ORDER_LIST: 100,
@@ -228,7 +229,13 @@ exports.createOrder = async (req, res) => {
     invalidateCache(`track:${normalizedPhone}`);
 
     // 10. Send Purchase to Meta (server-side). No await: it must never slow or break the order.
-    sendPurchase(order, req);
+    try {
+      sendPurchase(order, req);
+    } catch (e) {
+      console.error("Meta CAPI skipped:", e.message);
+    }
+
+    return res.status(201).json(order);
 
     return res.status(201).json(order);
   } catch (err) {
