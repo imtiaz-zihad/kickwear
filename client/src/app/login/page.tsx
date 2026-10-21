@@ -52,7 +52,7 @@ export default function AdminLogin() {
       {/* soft background glow */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute -top-40 left-1/2 h-[28rem] w-[28rem] -translate-x-1/2 rounded-full bg-primary/10 blur-3xl"
+        className="pointer-events-none absolute -top-40 left-1/2 h-112 w-md -translate-x-1/2 rounded-full bg-primary/10 blur-3xl"
       />
 
       <div className="relative w-full max-w-md">
