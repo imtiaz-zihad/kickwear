@@ -50,6 +50,7 @@ app.get("/health", (req, res) => res.status(200).json({ ok: true }));
 // ✅ Routes
 app.use("/api/products", require("./routes/productRoutes"));
 app.use("/api/orders", require("./routes/orderRoutes"));
+app.use("/api/abandoned", require("./routes/abandonedRoutes"));
 
 // ✅ 404 handler (always after all routes)
 app.use((req, res) => {

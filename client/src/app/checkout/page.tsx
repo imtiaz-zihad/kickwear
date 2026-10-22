@@ -20,9 +20,17 @@ import {
 } from "@/services/api";
 import type { Product } from "@/types/product";
 import { track, getMetaIds } from "@/lib/fbpixel";
+import { useAbandonedCheckout } from "@/lib/useAbandonedCheckout";
 
 const BD_PHONE_REGEX = /^01[3-9]\d{8}$/;
 const MAX_QTY = 10;
+
+// "+8801712345678" / "8801712345678" / "01712345678" -> "01712345678"
+const normalizePhone = (v: string) => {
+  let d = v.replace(/\D/g, "");
+  if (d.startsWith("880")) d = d.slice(2);
+  return d.slice(0, 11);
+};
 
 // Display only. The server recalculates the real prices.
 const DEFAULT_ADDON_PRICE = 200;
@@ -150,6 +158,16 @@ export default function CheckoutPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [placed, setPlaced] = useState<Order | null>(null);
+
+  // Save typed details (once a valid phone is entered) for follow-up
+  useAbandonedCheckout({
+    enabled: loadState === "ready" && !placed,
+    form,
+    productId: product?._id,
+    productName: product?.name,
+    size: stored?.size,
+    quantity: stored?.quantity,
+  });
 
   // Load the saved selection + the product
   useEffect(() => {
@@ -430,14 +448,10 @@ export default function CheckoutPage() {
                 type="tel"
                 inputMode="numeric"
                 autoComplete="tel"
-                maxLength={11}
                 placeholder="01XXXXXXXXX"
                 value={form.phone}
                 onChange={(e) =>
-                  setForm({
-                    ...form,
-                    phone: e.target.value.replace(/\D/g, "").slice(0, 11),
-                  })
+                  setForm({ ...form, phone: normalizePhone(e.target.value) })
                 }
                 aria-invalid={Boolean(errors.phone)}
                 className={inputClass(Boolean(errors.phone))}
@@ -595,6 +609,10 @@ export default function CheckoutPage() {
               {submitError}
             </p>
           )}
+
+          <p className="text-center text-xs text-muted-foreground">
+            Apnar phone number diye amra order niye jogajog korte pari.
+          </p>
 
           <button
             type="submit"

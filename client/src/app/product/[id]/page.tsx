@@ -178,7 +178,7 @@ export default async function ProductDetails({
               <div>
                 <p className="text-sm font-semibold">Fast Delivery</p>
                 <p className="text-xs text-muted-foreground">
-                  Dhaka ৳60 · Outside ৳120
+                  Dhaka ৳70 · Outside ৳130
                 </p>
               </div>
             </div>

@@ -3,12 +3,12 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { LayoutDashboard, LogOut, Package, ShoppingCart, Store } from "lucide-react";
-
+ import { LayoutDashboard, LogOut, Package, PhoneMissed, ShoppingCart, Store } from "lucide-react";
 const MENU = [
   { name: "Dashboard", path: "/admin/dashboard", icon: LayoutDashboard },
   { name: "Products", path: "/admin/products", icon: Package },
   { name: "Orders", path: "/admin/orders", icon: ShoppingCart },
+  { name: "Abandoned", path: "/admin/abandoned", icon: PhoneMissed },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
