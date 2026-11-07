@@ -1,10 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Eye, Loader2, Search } from "lucide-react";
-import { STATUSES, STATUS_BADGE, api, areaLabel, getArea, money, shortId } from "./lib";
-import type { Order, OrderStatus } from "./lib";
-import { ItemLine, OrderModal, productionNote } from "./OrderParts";
+import { Eye, Loader2, Plus, Search } from "lucide-react";
+import {
+  SOURCE_LABEL,
+  STATUSES,
+  STATUS_BADGE,
+  api,
+  areaLabel,
+  getArea,
+  money,
+  shortId,
+} from "./lib";
+import type { EditPayload, Order, OrderStatus } from "./lib";
+import { Chip, ItemLine, OrderModal, productionNote } from "./OrderParts";
+import NewOrderModal from "./NewOrderModal";
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -13,6 +23,7 @@ export default function OrdersPage() {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<OrderStatus | "All">("All");
   const [selected, setSelected] = useState<Order | null>(null);
+  const [newOpen, setNewOpen] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ text: string; error?: boolean } | null>(null);
 
@@ -25,7 +36,10 @@ export default function OrdersPage() {
     let cancelled = false;
     api<{ data?: Order[] } | Order[]>("/orders?limit=200&noCache=true")
       .then((res) => !cancelled && setOrders(Array.isArray(res) ? res : (res.data ?? [])))
-      .catch((err) => !cancelled && setError(err instanceof Error ? err.message : "Failed to load orders"))
+      .catch(
+        (err) =>
+          !cancelled && setError(err instanceof Error ? err.message : "Failed to load orders"),
+      )
       .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
@@ -42,7 +56,11 @@ export default function OrdersPage() {
 
   const changeStatus = async (order: Order, status: OrderStatus) => {
     if (status === order.status) return;
-    if (status === "Confirmed" && !window.confirm("This sends a confirmation SMS to the customer. Continue?")) {
+    if (status === "Cancelled" && !window.confirm(`Cancel order #${shortId(order)}?`)) return;
+    if (
+      status === "Confirmed" &&
+      !window.confirm("This sends a confirmation SMS to the customer. Continue?")
+    ) {
       return;
     }
 
@@ -60,6 +78,22 @@ export default function OrdersPage() {
     } finally {
       setUpdatingId(null);
     }
+  };
+
+  const saveEdit = async (order: Order, payload: EditPayload) => {
+    const updated = await api<Order>(`/orders/${order._id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+    setOrders((prev) => prev.map((o) => (o._id === updated._id ? updated : o)));
+    setSelected((s) => (s && s._id === updated._id ? updated : s));
+    flash(`Order #${shortId(updated)} updated`);
+  };
+
+  const handleCreated = (order: Order) => {
+    setOrders((prev) => [order, ...prev]);
+    setNewOpen(false);
+    flash(`Order #${shortId(order)} created`);
   };
 
   const copyNote = async (order: Order) => {
@@ -87,15 +121,25 @@ export default function OrdersPage() {
           !q ||
           o.customerName.toLowerCase().includes(q) ||
           o.phone.includes(q) ||
-          shortId(o).toLowerCase().includes(q)
+          shortId(o).toLowerCase().includes(q),
       );
   }, [orders, filter, query]);
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold md:text-3xl">Orders</h1>
-        <p className="text-muted-foreground">{orders.length} total orders</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold md:text-3xl">Orders</h1>
+          <p className="text-muted-foreground">{orders.length} total orders</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setNewOpen(true)}
+          className="flex h-10 items-center gap-1.5 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+        >
+          <Plus className="h-4 w-4" />
+          New order
+        </button>
       </div>
 
       {/* Filters */}
@@ -155,9 +199,17 @@ export default function OrdersPage() {
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="font-semibold">{order.customerName}</h3>
                     <span className="text-xs text-muted-foreground">#{shortId(order)}</span>
-                    <span className={`text-xs font-semibold ${area === "dhaka" ? "text-green-600" : "text-red-500"}`}>
+                    <span
+                      className={`text-xs font-semibold ${
+                        area === "dhaka" ? "text-green-600" : "text-red-500"
+                      }`}
+                    >
                       {areaLabel(area)}
                     </span>
+                    {order.source && order.source !== "web" && (
+                      <Chip accent>{SOURCE_LABEL[order.source]}</Chip>
+                    )}
+                    {order.edited && <Chip>Edited</Chip>}
                   </div>
                   <p className="text-sm text-muted-foreground">
                     {order.phone} · {order.address}
@@ -169,11 +221,15 @@ export default function OrdersPage() {
                     ))}
                   </div>
 
-                  <p className="text-xs text-muted-foreground">{new Date(order.createdAt).toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {new Date(order.createdAt).toLocaleString()}
+                  </p>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3 border-t border-border/60 pt-3">
-                  <p className="mr-auto text-lg font-semibold text-primary">{money(order.totalPrice)}</p>
+                  <p className="mr-auto text-lg font-semibold text-primary">
+                    {money(order.totalPrice)}
+                  </p>
 
                   <select
                     value={order.status}
@@ -212,7 +268,13 @@ export default function OrdersPage() {
           onClose={() => setSelected(null)}
           onChangeStatus={changeStatus}
           onCopyNote={copyNote}
+          onSaveEdit={saveEdit}
         />
+      )}
+
+      {/* New order modal */}
+      {newOpen && (
+        <NewOrderModal onClose={() => setNewOpen(false)} onCreated={handleCreated} />
       )}
 
       {/* Toast */}

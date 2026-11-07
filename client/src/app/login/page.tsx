@@ -6,8 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Eye, EyeOff, Loader2, Lock } from "lucide-react";
 
-// Set NEXT_PUBLIC_ADMIN_PASSWORD in Vercel (and in client/.env.local for local dev)
-const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD;
+const API = process.env.NEXT_PUBLIC_API_BASE_URL;
 
 export default function AdminLogin() {
   const router = useRouter();
@@ -16,7 +15,7 @@ export default function AdminLogin() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loading) return;
 
@@ -28,23 +27,36 @@ export default function AdminLogin() {
     setLoading(true);
     setError("");
 
-    setTimeout(() => {
-      if (ADMIN_PASSWORD && password === ADMIN_PASSWORD) {
-        try {
-          localStorage.setItem("admin", "true");
-        } catch {
-          setError("Could not sign in. Please enable browser storage.");
-          setLoading(false);
-          return;
-        }
-        router.push("/admin/dashboard");
-        return; // keep the loading state while navigating
+    try {
+      const res = await fetch(`${API}/admin/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || !data.token) {
+        throw new Error(
+          res.status === 401
+            ? "Incorrect password. Please try again."
+            : data.message || "Could not sign in. Please try again.",
+        );
       }
 
-      setError("Incorrect password. Please try again.");
+      try {
+        localStorage.setItem("adminToken", data.token);
+        localStorage.setItem("admin", "true");
+      } catch {
+        throw new Error("Could not sign in. Please enable browser storage.");
+      }
+
+      router.push("/admin/dashboard");
+      return; // keep the loading state while navigating
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not sign in.");
       setPassword("");
       setLoading(false);
-    }, 400);
+    }
   };
 
   return (

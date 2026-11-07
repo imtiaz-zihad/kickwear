@@ -84,7 +84,7 @@ export function useAbandonedCheckout({
 
     const t = setTimeout(() => send(body), 1500);
     return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [enabled, form, productId, productName, size, quantity]);
 
   // Flush immediately when the visitor leaves / switches app
@@ -101,6 +101,5 @@ export function useAbandonedCheckout({
       document.removeEventListener("visibilitychange", flush);
       window.removeEventListener("pagehide", flush);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled]);
 }

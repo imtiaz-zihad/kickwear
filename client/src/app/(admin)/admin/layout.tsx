@@ -3,12 +3,22 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
- import { LayoutDashboard, LogOut, Package, PhoneMissed, ShoppingCart, Store } from "lucide-react";
+import {
+  Activity,
+  LayoutDashboard,
+  LogOut,
+  Package,
+  PhoneMissed,
+  ShoppingCart,
+  Store,
+} from "lucide-react";
+
 const MENU = [
   { name: "Dashboard", path: "/admin/dashboard", icon: LayoutDashboard },
   { name: "Products", path: "/admin/products", icon: Package },
   { name: "Orders", path: "/admin/orders", icon: ShoppingCart },
   { name: "Abandoned", path: "/admin/abandoned", icon: PhoneMissed },
+  { name: "Live", path: "/admin/live", icon: Activity },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -17,7 +27,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [authorized, setAuthorized] = useState(false);
 
   useEffect(() => {
-    if (!localStorage.getItem("admin")) {
+    // the token comes from the server login (/api/admin/login)
+    if (!localStorage.getItem("adminToken")) {
+      localStorage.removeItem("admin");
       router.replace("/login");
     } else {
       // eslint-disable-next-line react-hooks/set-state-in-effect
