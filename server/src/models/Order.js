@@ -1,8 +1,9 @@
 // src/models/Order.js
 const mongoose = require("mongoose");
 
-const STATUSES = ["Pending", "Confirmed", "Shipped", "Delivered"];
+const STATUSES = ["Pending", "Confirmed", "Shipped", "Delivered", "Cancelled"];
 const DELIVERY_AREAS = ["dhaka", "outside"];
+const SOURCES = ["web", "messenger", "whatsapp", "instagram", "phone"];
 
 const orderItemSchema = new mongoose.Schema(
   {
@@ -42,7 +43,14 @@ const orderSchema = new mongoose.Schema(
 
     status: { type: String, enum: STATUSES, default: "Pending" },
 
+    // where the order came from (web = website checkout)
+    source: { type: String, enum: SOURCES, default: "web" },
+
     size: { type: String, default: null }, // legacy (old orders)
+
+    // set when an admin edits the order
+    edited: { type: Boolean, default: false },
+    originalTotal: { type: Number, default: null },
   },
   { timestamps: true },
 );
@@ -55,3 +63,4 @@ orderSchema.index({ status: 1, createdAt: -1 });
 module.exports = mongoose.model("Order", orderSchema);
 module.exports.STATUSES = STATUSES;
 module.exports.DELIVERY_AREAS = DELIVERY_AREAS;
+module.exports.SOURCES = SOURCES;

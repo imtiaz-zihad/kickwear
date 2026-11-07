@@ -23,13 +23,18 @@ app.use(
       "http://localhost:3000",
       "https://kickwear.shop",
       "https://www.kickwear.shop",
-      "https://kickwear-seven.vercel.app"
+      "https://kickwear-seven.vercel.app",
     ],
     credentials: true,
-  })
+  }),
 );
 
 app.use(express.json({ limit: "10kb" })); // ✅ Limit request body size
+
+// ✅ Live tracking + admin live stats. Mounted BEFORE the general limiter on purpose:
+//    a visitor pings every ~20s and the admin page polls, which would use up
+//    the 100-requests-per-15-minutes budget. It has its own limiter inside.
+app.use("/api/live", require("./routes/liveRoutes"));
 
 // ✅ General rate limiter (100 requests per 15 min per IP)
 const generalLimiter = rateLimit({
@@ -48,6 +53,7 @@ app.get("/", (req, res) => {
 app.get("/health", (req, res) => res.status(200).json({ ok: true }));
 
 // ✅ Routes
+app.use("/api/admin", require("./routes/adminRoutes"));
 app.use("/api/products", require("./routes/productRoutes"));
 app.use("/api/orders", require("./routes/orderRoutes"));
 app.use("/api/abandoned", require("./routes/abandonedRoutes"));

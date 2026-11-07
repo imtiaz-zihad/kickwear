@@ -11,64 +11,14 @@ const CACHE_TTL = {
   TRACK_ORDER: 30,
 };
 
-// ✅ Create order
-// exports.createOrder = async (req, res) => {
-//   try {
-//     const {
-//       customerName,
-//       phone,
-//       address,
-//       items,
-//       totalPrice,
-//       deliveryCharge,
-//       size,
-//     } = req.body;
+// Channels an admin may tag a manually created order with
+const ADMIN_SOURCES = ["messenger", "whatsapp", "instagram", "phone"];
 
-//     if (!customerName || !phone || !address || !items || !totalPrice) {
-//       return res.status(400).json({ message: "Missing required fields" });
-//     }
-
-//     if (!/^01[3-9]\d{8}$/.test(phone)) {
-//       return res
-//         .status(400)
-//         .json({ message: "Invalid Bangladeshi phone number" });
-//     }
-
-//     if (!Array.isArray(items) || items.length === 0) {
-//       return res
-//         .status(400)
-//         .json({ message: "Order must have at least one item" });
-//     }
-
-//     const order = await Order.create({
-//       customerName,
-//       phone,
-//       address,
-//       items,
-//       totalPrice,
-//       deliveryCharge: deliveryCharge || 0,
-//       size: size || null,
-//     });
-
-//     invalidateCache("orders:");
-//     invalidateCache(`track:${phone}`);
-
-//     res.status(201).json(order);
-//   } catch (err) {
-//     res.status(500).json({ message: err.message });
-//   }
-// };
-
-
+// Used by POST /orders (public) and POST /orders/admin-create (admin).
+// The admin route sets req.adminCreated = true.
 exports.createOrder = async (req, res) => {
   try {
-    const {
-      customerName,
-      phone,
-      address,
-      deliveryArea,
-      items,
-    } = req.body;
+    const { customerName, phone, address, deliveryArea, items } = req.body;
 
     // 1. Validate required fields
     if (
@@ -199,9 +149,7 @@ exports.createOrder = async (req, res) => {
         basePrice,
         uclPatch,
         customName: wantsPrinting ? customName.trim() : null,
-        customNumber: wantsPrinting
-          ? String(customNumber).trim()
-          : null,
+        customNumber: wantsPrinting ? String(customNumber).trim() : null,
         addOnsPrice,
         price: finalUnitPrice,
       });
@@ -222,20 +170,27 @@ exports.createOrder = async (req, res) => {
       items: orderItems,
       deliveryCharge,
       totalPrice,
+      // Only an admin can tag a channel; public orders are always "web"
+      source:
+        req.adminCreated && ADMIN_SOURCES.includes(req.body.source)
+          ? req.body.source
+          : "web",
     });
 
     // 9. Clear relevant caches
     invalidateCache("orders:");
     invalidateCache(`track:${normalizedPhone}`);
 
-    // 10. Send Purchase to Meta (server-side). No await: it must never slow or break the order.
-    try {
-      sendPurchase(order, req);
-    } catch (e) {
-      console.error("Meta CAPI skipped:", e.message);
+    // 10. Send Purchase to Meta (server-side), website orders only.
+    //     Admin-created orders would carry the admin's IP/browser and hurt
+    //     matching quality. No await: it must never slow or break the order.
+    if (!req.adminCreated) {
+      try {
+        sendPurchase(order, req);
+      } catch (e) {
+        console.error("Meta CAPI skipped:", e.message);
+      }
     }
-
-    return res.status(201).json(order);
 
     return res.status(201).json(order);
   } catch (err) {
@@ -247,20 +202,19 @@ exports.createOrder = async (req, res) => {
   }
 };
 
-// ✅ Update order status + send SMS on Confirmed
+// ✅ Update order status + send SMS (only for statuses that have a message)
 exports.updateStatus = async (req, res) => {
   try {
     const { status } = req.body;
 
-    const validStatuses = ["Pending", "Confirmed", "Shipped", "Delivered"];
-    if (!validStatuses.includes(status)) {
+    if (!Order.STATUSES.includes(status)) {
       return res.status(400).json({ message: "Invalid status value" });
     }
 
     const order = await Order.findByIdAndUpdate(
       req.params.id,
       { status },
-      { new: true },
+      { new: true, runValidators: true },
     );
 
     if (!order) return res.status(404).json({ message: "Order not found" });
@@ -268,12 +222,12 @@ exports.updateStatus = async (req, res) => {
     invalidateCache("orders:");
     invalidateCache(`track:${order.phone}`);
 
-    // ✅ Send SMS only when Confirmed
+    // SMS only when a message exists for that status (Cancelled: no SMS)
     if (SMS_MESSAGES[status]) {
       const message = SMS_MESSAGES[status](
         order.customerName,
-        order.totalPrice, // ✅ total
-        order.phone, // ✅ phone for track link
+        order.totalPrice,
+        order.phone,
       );
       sendSMS(order.phone, message);
     }
@@ -284,7 +238,7 @@ exports.updateStatus = async (req, res) => {
   }
 };
 
-// ✅ Track order by phone
+// ✅ Track order by phone (public)
 exports.trackOrder = async (req, res) => {
   try {
     const { phone } = req.params;
@@ -336,5 +290,98 @@ exports.getOrders = async (req, res) => {
     res.json(result);
   } catch (err) {
     res.status(500).json({ message: err.message });
+  }
+};
+
+// ✅ Admin edit: size / quantity / unit price / delivery charge
+// Only while the order is Pending or Confirmed (before it goes to the courier)
+exports.updateOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ message: "Invalid order id" });
+    }
+
+    const order = await Order.findById(id);
+    if (!order) return res.status(404).json({ message: "Order not found" });
+
+    if (!["Pending", "Confirmed"].includes(order.status)) {
+      return res
+        .status(409)
+        .json({ message: `A ${order.status} order cannot be edited` });
+    }
+
+    const { items, deliveryCharge } = req.body || {};
+
+    if (items !== undefined) {
+      if (!Array.isArray(items) || items.length !== order.items.length) {
+        return res.status(400).json({ message: "Items do not match this order" });
+      }
+
+      for (let i = 0; i < items.length; i++) {
+        const patch = items[i] || {};
+        const item = order.items[i];
+
+        if (patch.size !== undefined) {
+          const size =
+            typeof patch.size === "string" && patch.size.trim()
+              ? patch.size.trim()
+              : null;
+          if (size) {
+            const product = mongoose.isValidObjectId(item.productId)
+              ? await Product.findById(item.productId).select("sizes name").lean()
+              : null;
+            if (product?.sizes?.length && !product.sizes.includes(size)) {
+              return res.status(400).json({
+                message: `Size ${size} is not available for ${product.name}`,
+              });
+            }
+          }
+          item.size = size;
+        }
+
+        if (patch.quantity !== undefined) {
+          const q = Number(patch.quantity);
+          if (!Number.isInteger(q) || q < 1 || q > 20) {
+            return res.status(400).json({ message: "Quantity must be 1–20" });
+          }
+          item.quantity = q;
+        }
+
+        if (patch.price !== undefined) {
+          const p = Number(patch.price);
+          if (!Number.isFinite(p) || p < 0 || p > 100000) {
+            return res.status(400).json({ message: "Invalid price" });
+          }
+          item.price = p;
+          item.basePrice = Math.max(0, p - (item.addOnsPrice || 0));
+        }
+      }
+    }
+
+    if (deliveryCharge !== undefined) {
+      const d = Number(deliveryCharge);
+      if (!Number.isFinite(d) || d < 0 || d > 1000) {
+        return res.status(400).json({ message: "Invalid delivery charge" });
+      }
+      order.deliveryCharge = d;
+    }
+
+    // remember the original total once, for discount tracking
+    if (order.originalTotal == null) order.originalTotal = order.totalPrice;
+
+    const itemsTotal = order.items.reduce((s, it) => s + it.price * it.quantity, 0);
+    order.totalPrice = itemsTotal + order.deliveryCharge;
+    order.edited = true;
+
+    await order.save();
+
+    invalidateCache("orders:");
+    invalidateCache(`track:${order.phone}`);
+
+    res.json(order);
+  } catch (err) {
+    console.error("Update Order Error:", err);
+    res.status(500).json({ message: "Failed to update order" });
   }
 };
