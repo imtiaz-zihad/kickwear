@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import LayoutWrapper from "@/components/LayoutWrapper";
+import LiveTracker from "@/components/Common/LiveTracker";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,9 +31,8 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <LayoutWrapper>
-          {children}
-        </LayoutWrapper>
+        <LiveTracker />
+        <LayoutWrapper>{children}</LayoutWrapper>
       </body>
     </html>
   );
