@@ -10,47 +10,8 @@ import {
   ShoppingCart,
   TrendingUp,
 } from "lucide-react";
-
-const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
-
-type OrderItem = { name: string; quantity: number };
-type Order = {
-  _id: string;
-  customerName: string;
-  items: OrderItem[];
-  totalPrice: number;
-  status: string;
-  createdAt: string;
-};
-
-const STATUS_BADGE: Record<string, string> = {
-  Pending: "bg-yellow-100 text-yellow-700",
-  Confirmed: "bg-green-100 text-green-700",
-  Shipped: "bg-orange-100 text-orange-700",
-  Delivered: "bg-blue-100 text-blue-700",
-};
-
-const money = (n: number) => `৳${(n ?? 0).toLocaleString()}`;
-
-const authHeaders = (): Record<string, string> => {
-  try {
-    const t = localStorage.getItem("adminToken");
-    return t ? { Authorization: `Bearer ${t}` } : {};
-  } catch {
-    return {};
-  }
-};
-
-async function api<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    cache: "no-store",
-    headers: authHeaders(),
-  });
-  const data = await res.json().catch(() => null);
-  if (!res.ok)
-    throw new Error(data?.message || `Request failed (${res.status})`);
-  return data as T;
-}
+import { STATUS_BADGE, api, money } from "../orders/lib";
+import type { Order } from "../orders/lib";
 
 export default function Dashboard() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -95,8 +56,10 @@ export default function Dashboard() {
     };
   }, []);
 
-  // totalPrice already includes delivery
-  const revenue = orders.reduce((sum, o) => sum + (o.totalPrice ?? 0), 0);
+  // cancelled orders are not revenue. totalPrice already includes delivery
+  const revenue = orders
+    .filter((o) => o.status !== "Cancelled")
+    .reduce((sum, o) => sum + (o.totalPrice ?? 0), 0);
   const pending = orders.filter((o) => o.status === "Pending").length;
   const delivered = orders.filter((o) => o.status === "Delivered").length;
 

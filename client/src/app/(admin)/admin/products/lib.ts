@@ -55,7 +55,6 @@ export const SIZES = ["S", "M", "L", "XL", "2XL"];
 export const DEFAULT_ADDON_PRICE = 200;
 export const PAGE_SIZE = 100;
 
-
 export const money = (n: number) => `৳${(n ?? 0).toLocaleString()}`;
 
 export const categoryLabel = (slug: string) =>
@@ -74,7 +73,6 @@ export const fromSlug = (slug?: string) =>
 export const field =
   "h-11 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none transition-colors focus:ring-2 focus:ring-primary";
 
-
 const authHeaders = (): Record<string, string> => {
   try {
     const t = localStorage.getItem("adminToken");
@@ -90,6 +88,16 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     cache: "no-store",
     headers: { "Content-Type": "application/json", ...authHeaders() },
   });
+
+  // token missing/expired: back to the login page
+  if (res.status === 401 && typeof window !== "undefined") {
+    try {
+      localStorage.removeItem("adminToken");
+      localStorage.removeItem("admin");
+    } catch {}
+    window.location.href = "/login";
+  }
+
   const data = await res.json().catch(() => null);
   if (!res.ok) throw new Error(data?.message || `Request failed (${res.status})`);
   return data as T;
@@ -107,7 +115,6 @@ export async function uploadImage(file: File): Promise<string> {
   if (!res.ok || !data?.secure_url) throw new Error(data?.error?.message || "Upload failed");
   return data.secure_url as string;
 }
-
 
 export const emptyForm = (): FormState => ({
   name: "",

@@ -8,11 +8,12 @@ const {
   updateProduct,
   deleteProduct,
 } = require("../controllers/productController");
+const { requireAdmin } = require("../middleware/adminAuth");
 
-router.get("/", getProducts);
-router.get("/:id", getSingleProduct);
-router.post("/", addProduct);
-router.patch("/:id", updateProduct);
-router.delete("/:id", deleteProduct);
+router.get("/", getProducts); // public (storefront)
+router.get("/:id", getSingleProduct); // public (storefront)
+router.post("/", requireAdmin, addProduct);
+router.patch("/:id", requireAdmin, updateProduct);
+router.delete("/:id", requireAdmin, deleteProduct);
 
 module.exports = router;
