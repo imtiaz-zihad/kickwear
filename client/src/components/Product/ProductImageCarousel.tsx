@@ -55,7 +55,6 @@ export default function ProductImageCarousel({ images, name }: Props) {
                   alt={`${name} - ${i + 1}`}
                   fill
                   sizes="(max-width: 1024px) 100vw, 50vw"
-                  quality={85}
                   className="object-cover"
                   priority={i === 0}
                 />
