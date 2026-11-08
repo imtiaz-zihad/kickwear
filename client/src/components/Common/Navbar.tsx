@@ -11,9 +11,11 @@ import {
   History,
   Shirt,
   ShieldCheck,
+  ShoppingCart,
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "../ui/button";
+import { useCart } from "@/lib/cart";
 
 // WhatsApp number
 const WHATSAPP_NUMBER = "8801894302115";
@@ -41,6 +43,7 @@ const WhatsAppIcon = ({ className = "h-4 w-4" }: { className?: string }) => (
 const Navbar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
+  const { count } = useCart();
 
   const isActive = (path: string) => pathname.startsWith(path);
 
@@ -90,7 +93,7 @@ const Navbar = () => {
         </nav>
 
         {/* RIGHT SIDE */}
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1 md:gap-2">
           {/* WHATSAPP - DESKTOP */}
           <a
             href={`https://wa.me/${WHATSAPP_NUMBER}`}
@@ -113,6 +116,24 @@ const Navbar = () => {
           >
             <MapPin className="h-4 w-4" />
             Track Order
+          </Link>
+
+          {/* CART */}
+          <Link
+            href="/cart"
+            aria-label={count > 0 ? `Cart, ${count} items` : "Cart"}
+            className={`relative flex h-10 w-10 items-center justify-center rounded-full transition-colors md:h-11 md:w-11 ${
+              isActive("/cart")
+                ? "bg-primary text-primary-foreground"
+                : "text-foreground hover:bg-secondary"
+            }`}
+          >
+            <ShoppingCart className="h-6 w-6" />
+            {count > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold leading-none text-white shadow-sm">
+                {count > 99 ? "99+" : count}
+              </span>
+            )}
           </Link>
 
           {/* MOBILE MENU BUTTON */}

@@ -2,13 +2,22 @@
 
 import Link from "next/link";
 import { useId, useRef, useState } from "react";
-import { CheckCircle2, Check, Loader2, MapPin, Phone, ShoppingBag } from "lucide-react";
+import {
+  CheckCircle2,
+  Check,
+  Loader2,
+  MapPin,
+  Phone,
+  ShoppingBag,
+  ShoppingCart,
+} from "lucide-react";
 import QuantitySelector from "./QuantitySelector";
 import SizeChart, { SIZE_CHART } from "./SizeChart";
 import type { ProductAddOns } from "@/types/product";
 import { createOrder, type DeliveryArea, type Order } from "@/services/api";
 import { track, getMetaIds } from "@/lib/fbpixel";
 import { useAbandonedCheckout } from "@/lib/useAbandonedCheckout";
+import { useCart } from "@/lib/cart";
 
 // Mirrors the backend default. The backend recalculates the real price.
 const DEFAULT_ADDON_PRICE = 200;
@@ -35,6 +44,7 @@ interface Props {
   productId: string;
   productName: string; // used in the WhatsApp message
   basePrice: number; // discounted jersey price
+  image?: string | null; // first product image (shown in the cart)
   sizes?: string[]; // empty → no size selection needed
   addOns?: ProductAddOns;
   outOfStock?: boolean;
@@ -167,16 +177,21 @@ export default function OrderButton({
   productId,
   productName,
   basePrice,
+  image,
   sizes = [],
   addOns,
   outOfStock = false,
 }: Props) {
   const uid = useId();
+  const { addItem, count: cartCount } = useCart();
 
   // wraps both the form and the success card (used to scroll after ordering)
   const rootRef = useRef<HTMLDivElement>(null);
   // makes AddToCart / InitiateCheckout fire only once per visit
   const startedRef = useRef(false);
+  // AddToCart already sent by the "Add to Cart" button
+  const cartTrackedRef = useRef(false);
+  const addedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [quantity, setQuantity] = useState(1);
   const [size, setSize] = useState<string | null>(null);
@@ -195,6 +210,7 @@ export default function OrderButton({
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [placed, setPlaced] = useState<Order | null>(null);
+  const [cartMsg, setCartMsg] = useState<"" | "added" | "full">("");
 
   const needsSize = sizes.length > 0;
   const uclAvailable = addOns?.uclPatch?.enabled === true;
@@ -240,20 +256,21 @@ export default function OrderButton({
   const whatsappHref = `https://wa.me/${CONTACT_NUMBER}?text=${encodeURIComponent(waMessage)}`;
   const callHref = `tel:+${CONTACT_NUMBER}`;
 
+  const pixelData = () => ({
+    content_ids: [productId],
+    content_name: productName,
+    content_type: "product",
+    value: subtotal,
+    currency: "BDT",
+    num_items: quantity,
+  });
+
   // Fires once, when the customer starts filling in the delivery details
   const handleFormStart = () => {
     if (startedRef.current) return;
     startedRef.current = true;
-    const data = {
-      content_ids: [productId],
-      content_name: productName,
-      content_type: "product",
-      value: subtotal,
-      currency: "BDT",
-      num_items: quantity,
-    };
-    track("AddToCart", data);
-    track("InitiateCheckout", data);
+    if (!cartTrackedRef.current) track("AddToCart", pixelData());
+    track("InitiateCheckout", pixelData());
   };
 
   const scrollToId = (id: string) => {
@@ -265,7 +282,8 @@ export default function OrderButton({
     }
   };
 
-  const validate = (): boolean => {
+  // includeDelivery=false → only check the product selection (for Add to Cart)
+  const validate = (includeDelivery: boolean): boolean => {
     const e: Errors = {};
     let firstId = "";
     const fail = (key: keyof Errors, msg: string, id: string) => {
@@ -277,14 +295,17 @@ export default function OrderButton({
     if (printActive && !customName.trim() && !customNumber.trim()) {
       fail("print", "Enter a name or number to print", `${uid}-print`);
     }
-    if (!form.customerName.trim()) {
-      fail("customerName", "Please enter your name", `${uid}-cname`);
-    }
-    if (!BD_PHONE_REGEX.test(form.phone)) {
-      fail("phone", "Enter a valid 11-digit mobile number (01XXXXXXXXX)", `${uid}-phone`);
-    }
-    if (!form.address.trim()) {
-      fail("address", "Please enter your full address", `${uid}-address`);
+
+    if (includeDelivery) {
+      if (!form.customerName.trim()) {
+        fail("customerName", "Please enter your name", `${uid}-cname`);
+      }
+      if (!BD_PHONE_REGEX.test(form.phone)) {
+        fail("phone", "Enter a valid 11-digit mobile number (01XXXXXXXXX)", `${uid}-phone`);
+      }
+      if (!form.address.trim()) {
+        fail("address", "Please enter your full address", `${uid}-address`);
+      }
     }
 
     setErrors(e);
@@ -292,9 +313,39 @@ export default function OrderButton({
     return Object.keys(e).length === 0;
   };
 
+  const handleAddToCart = () => {
+    if (outOfStock || !validate(false)) return;
+
+    const result = addItem({
+      productId,
+      name: productName,
+      image: image ?? null,
+      size,
+      quantity,
+      uclPatch: uclActive,
+      customName: printActive ? customName.trim() || null : null,
+      customNumber: printActive ? customNumber.trim() || null : null,
+      basePrice,
+      uclPrice,
+      printPrice,
+    });
+
+    if (addedTimer.current) clearTimeout(addedTimer.current);
+
+    if (result === "full") {
+      setCartMsg("full");
+      return;
+    }
+
+    track("AddToCart", pixelData());
+    cartTrackedRef.current = true;
+    setCartMsg("added");
+    addedTimer.current = setTimeout(() => setCartMsg(""), 8000);
+  };
+
   const handleSubmit = async (ev: React.FormEvent) => {
     ev.preventDefault();
-    if (submitting || outOfStock || !validate()) return;
+    if (submitting || outOfStock || !validate(true)) return;
 
     const name = printActive ? customName.trim() : "";
     const number = printActive ? customNumber.trim() : "";
@@ -425,7 +476,7 @@ export default function OrderButton({
                         setSize(s);
                         setErrors((e) => ({ ...e, size: undefined }));
                       }}
-                      className={`h-11 min-w-14 rounded-xl border px-4 text-sm font-semibold transition-colors ${
+                      className={`h-9 min-w-11 rounded-lg border px-3 text-sm font-semibold transition-colors ${
                         active
                           ? "border-primary bg-primary text-primary-foreground"
                           : "border-border bg-card hover:border-primary/50"
@@ -556,36 +607,74 @@ export default function OrderButton({
             </div>
           )}
 
-          {/* Quantity + WhatsApp + Call */}
+          {/* Contact + Quantity + Add to Cart (one row) */}
           <div>
             <span className="mb-2 block text-sm font-semibold">Quantity</span>
-            <div className="flex items-center gap-2">
+
+            <div className="flex flex-wrap items-center gap-2">
               <QuantitySelector quantity={quantity} setQuantity={setQuantity} />
 
-              <div className="ml-auto flex items-center gap-2">
+              {/* WhatsApp (wide) + Call */}
+              <div className="flex min-w-0 flex-1 basis-24 items-center gap-2">
                 <a
                   href={whatsappHref}
                   onClick={() => track("Contact", { content_name: productName })}
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="Order on WhatsApp"
-                  className="flex h-11 items-center justify-center gap-2 rounded-xl border border-green-600/40 px-3 text-sm font-semibold text-green-600 transition-colors hover:bg-green-50 sm:px-4"
+                  title="WhatsApp"
+                  className="flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-xl border border-green-600/40 px-3 text-sm font-semibold text-green-600 transition-colors hover:bg-green-50"
                 >
-                  <WhatsAppIcon />
-                  <span className="hidden sm:inline">WhatsApp</span>
+                  <WhatsAppIcon className="h-5 w-5 shrink-0" />
+                  <span className="hidden truncate sm:inline">WhatsApp</span>
                 </a>
 
                 <a
                   href={callHref}
                   onClick={() => track("Contact", { content_name: productName })}
                   aria-label="Call us"
-                  className="flex h-11 items-center justify-center gap-2 rounded-xl border border-border px-3 text-sm font-semibold text-foreground transition-colors hover:bg-secondary sm:px-4"
+                  title="Call"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border text-foreground transition-colors hover:bg-secondary"
                 >
                   <Phone className="h-5 w-5" />
-                  <span className="hidden sm:inline">Call</span>
                 </a>
               </div>
+
+              {/* Add to cart (right side) */}
+              <button
+                type="button"
+                onClick={handleAddToCart}
+                disabled={outOfStock}
+                className="ml-auto flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-lg border-2 border-primary px-4 text-sm font-semibold text-primary transition-colors hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <ShoppingCart size={16} />
+                Add to Cart
+              </button>
             </div>
+
+            {cartMsg === "added" && (
+              <div
+                role="status"
+                className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-green-50 px-4 py-3 text-sm text-green-700 dark:bg-green-950/20"
+              >
+                <span className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 shrink-0" />
+                  Added to cart ({cartCount} {cartCount === 1 ? "item" : "items"})
+                </span>
+                <Link href="/cart" className="shrink-0 font-semibold underline">
+                  View cart
+                </Link>
+              </div>
+            )}
+
+            {cartMsg === "full" && (
+              <p
+                role="alert"
+                className="mt-3 rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-600"
+              >
+                Your cart is full. Please place this order first, then add more.
+              </p>
+            )}
           </div>
 
           {/* Delivery info (single-page checkout) */}
@@ -701,11 +790,11 @@ export default function OrderButton({
           </div>
 
           {/* Place order */}
-          <div>
+          <div className="space-y-3">
             {submitError && (
               <p
                 role="alert"
-                className="mb-3 rounded-xl bg-red-500/10 p-3 text-sm text-red-600"
+                className="rounded-xl bg-red-500/10 p-3 text-sm text-red-600"
               >
                 {submitError}
               </p>
@@ -729,8 +818,9 @@ export default function OrderButton({
               )}
             </button>
 
-            <p className="mt-2 text-center text-xs text-muted-foreground">
-              Final price is confirmed by our system when you place the order.
+            <p className="text-center text-xs text-muted-foreground">
+              Ordering more than one jersey? Tap Add to Cart for each, then check
+              out together.
             </p>
           </div>
         </form>

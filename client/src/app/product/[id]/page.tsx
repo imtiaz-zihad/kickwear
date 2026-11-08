@@ -166,6 +166,7 @@ export default async function ProductDetails({
             productId={product._id}
             productName={product.name}
             basePrice={product.discountedPrice}
+            image={product.images?.[0]}
             sizes={product.sizes ?? []}
             addOns={product.addOns}
             outOfStock={outOfStock}

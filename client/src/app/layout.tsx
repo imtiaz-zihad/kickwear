@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import LayoutWrapper from "@/components/LayoutWrapper";
 import LiveTracker from "@/components/Common/LiveTracker";
+import { CartProvider } from "@/lib/cart";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -31,8 +32,10 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <LiveTracker />
-        <LayoutWrapper>{children}</LayoutWrapper>
+        <CartProvider>
+          <LiveTracker />
+          <LayoutWrapper>{children}</LayoutWrapper>
+        </CartProvider>
       </body>
     </html>
   );
