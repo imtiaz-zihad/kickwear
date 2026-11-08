@@ -1,18 +1,35 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useId, useState } from "react";
-import { Check, Phone, ShoppingBag } from "lucide-react";
+import Link from "next/link";
+import { useId, useRef, useState } from "react";
+import { CheckCircle2, Check, Loader2, MapPin, Phone, ShoppingBag } from "lucide-react";
 import QuantitySelector from "./QuantitySelector";
 import SizeChart, { SIZE_CHART } from "./SizeChart";
 import type { ProductAddOns } from "@/types/product";
-import { track } from "@/lib/fbpixel";
+import { createOrder, type DeliveryArea, type Order } from "@/services/api";
+import { track, getMetaIds } from "@/lib/fbpixel";
+import { useAbandonedCheckout } from "@/lib/useAbandonedCheckout";
 
 // Mirrors the backend default. The backend recalculates the real price.
 const DEFAULT_ADDON_PRICE = 200;
 
 // Same number as Navbar/Footer (international format, no "+")
 const CONTACT_NUMBER = "8801894302115";
+
+const BD_PHONE_REGEX = /^01[3-9]\d{8}$/;
+
+// "+8801712345678" / "8801712345678" / "01712345678" -> "01712345678"
+const normalizePhone = (v: string) => {
+  let d = v.replace(/\D/g, "");
+  if (d.startsWith("880")) d = d.slice(2);
+  return d.slice(0, 11);
+};
+
+// Display only. The server recalculates the real prices.
+const DELIVERY: Record<DeliveryArea, { label: string; hint: string; charge: number }> = {
+  dhaka: { label: "Inside Dhaka", hint: "Dhaka city", charge: 70 },
+  outside: { label: "Outside Dhaka", hint: "All over Bangladesh", charge: 130 },
+};
 
 interface Props {
   productId: string;
@@ -23,7 +40,13 @@ interface Props {
   outOfStock?: boolean;
 }
 
-type Errors = { size?: string; print?: string; storage?: string };
+type Errors = {
+  size?: string;
+  print?: string;
+  customerName?: string;
+  phone?: string;
+  address?: string;
+};
 
 const money = (n: number) => `৳${n.toLocaleString()}`;
 
@@ -85,14 +108,60 @@ function AddOn({
   );
 }
 
-function Row({ label, value }: { label: string; value: number }) {
+function Row({
+  label,
+  value,
+  strong = false,
+}: {
+  label: string;
+  value: number;
+  strong?: boolean;
+}) {
   return (
-    <div className="flex justify-between text-muted-foreground">
+    <div
+      className={`flex justify-between ${
+        strong
+          ? "border-t border-border/60 pt-2 text-base font-bold"
+          : "text-muted-foreground"
+      }`}
+    >
       <span>{label}</span>
-      <span>{money(value)}</span>
+      <span className={strong ? "text-primary" : ""}>{money(value)}</span>
     </div>
   );
 }
+
+function Field({
+  id,
+  label,
+  error,
+  children,
+}: {
+  id: string;
+  label: string;
+  error?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <label htmlFor={id} className="mb-1.5 block text-sm font-medium">
+        {label}
+      </label>
+      {children}
+      {error && (
+        <p role="alert" className="mt-1.5 text-sm text-red-600">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// text-base on phone stops iOS from zooming into the field
+const inputClass = (hasError: boolean) =>
+  `w-full rounded-xl border bg-background px-3.5 py-3 text-base transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary md:text-sm ${
+    hasError ? "border-red-500" : "border-border"
+  }`;
 
 export default function OrderButton({
   productId,
@@ -102,8 +171,12 @@ export default function OrderButton({
   addOns,
   outOfStock = false,
 }: Props) {
-  const router = useRouter();
   const uid = useId();
+
+  // wraps both the form and the success card (used to scroll after ordering)
+  const rootRef = useRef<HTMLDivElement>(null);
+  // makes AddToCart / InitiateCheckout fire only once per visit
+  const startedRef = useRef(false);
 
   const [quantity, setQuantity] = useState(1);
   const [size, setSize] = useState<string | null>(null);
@@ -111,7 +184,17 @@ export default function OrderButton({
   const [printOn, setPrintOn] = useState(false);
   const [customName, setCustomName] = useState("");
   const [customNumber, setCustomNumber] = useState("");
+
+  const [form, setForm] = useState({
+    customerName: "",
+    phone: "",
+    address: "",
+    deliveryArea: "dhaka" as DeliveryArea,
+  });
   const [errors, setErrors] = useState<Errors>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+  const [placed, setPlaced] = useState<Order | null>(null);
 
   const needsSize = sizes.length > 0;
   const uclAvailable = addOns?.uclPatch?.enabled === true;
@@ -124,9 +207,21 @@ export default function OrderButton({
 
   const unitPrice =
     basePrice + (uclActive ? uclPrice : 0) + (printActive ? printPrice : 0);
-  const total = unitPrice * quantity;
+  const subtotal = unitPrice * quantity;
+  const deliveryCharge = DELIVERY[form.deliveryArea].charge;
+  const total = subtotal + deliveryCharge;
 
   const chartRow = SIZE_CHART.find((r) => r.size === size);
+
+  // Save typed details (once a valid phone is entered) for follow-up
+  useAbandonedCheckout({
+    enabled: !placed && !outOfStock,
+    form,
+    productId,
+    productName,
+    size,
+    quantity,
+  });
 
   // WhatsApp message reflects the current selection
   const printText = [customName.trim(), customNumber.trim()]
@@ -138,293 +233,508 @@ export default function OrderButton({
     `Quantity: ${quantity}`,
     uclActive && "UCL patch: Yes",
     printActive && printText && `Name & number: ${printText}`,
-    `Total: ${money(total)} (+ delivery)`,
+    `Total: ${money(subtotal)} (+ delivery)`,
   ]
     .filter(Boolean)
     .join("\n");
   const whatsappHref = `https://wa.me/${CONTACT_NUMBER}?text=${encodeURIComponent(waMessage)}`;
   const callHref = `tel:+${CONTACT_NUMBER}`;
 
-  const handleOrder = () => {
-    if (needsSize && !size) {
-      setErrors({ size: "Please select a size" });
-      return;
+  // Fires once, when the customer starts filling in the delivery details
+  const handleFormStart = () => {
+    if (startedRef.current) return;
+    startedRef.current = true;
+    const data = {
+      content_ids: [productId],
+      content_name: productName,
+      content_type: "product",
+      value: subtotal,
+      currency: "BDT",
+      num_items: quantity,
+    };
+    track("AddToCart", data);
+    track("InitiateCheckout", data);
+  };
+
+  const scrollToId = (id: string) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+      el.focus({ preventScroll: true });
     }
+  };
+
+  const validate = (): boolean => {
+    const e: Errors = {};
+    let firstId = "";
+    const fail = (key: keyof Errors, msg: string, id: string) => {
+      e[key] = msg;
+      if (!firstId) firstId = id;
+    };
+
+    if (needsSize && !size) fail("size", "Please select a size", `${uid}-size`);
+    if (printActive && !customName.trim() && !customNumber.trim()) {
+      fail("print", "Enter a name or number to print", `${uid}-print`);
+    }
+    if (!form.customerName.trim()) {
+      fail("customerName", "Please enter your name", `${uid}-cname`);
+    }
+    if (!BD_PHONE_REGEX.test(form.phone)) {
+      fail("phone", "Enter a valid 11-digit mobile number (01XXXXXXXXX)", `${uid}-phone`);
+    }
+    if (!form.address.trim()) {
+      fail("address", "Please enter your full address", `${uid}-address`);
+    }
+
+    setErrors(e);
+    if (firstId) scrollToId(firstId);
+    return Object.keys(e).length === 0;
+  };
+
+  const handleSubmit = async (ev: React.FormEvent) => {
+    ev.preventDefault();
+    if (submitting || outOfStock || !validate()) return;
 
     const name = printActive ? customName.trim() : "";
     const number = printActive ? customNumber.trim() : "";
 
-    if (printActive && !name && !number) {
-      setErrors({ print: "Enter a name or number to print" });
-      return;
-    }
+    setSubmitting(true);
+    setSubmitError("");
 
     try {
-      localStorage.setItem(
-        "order",
-        JSON.stringify({
-          productId,
-          quantity,
-          size,
-          uclPatch: uclActive,
-          customName: name || null,
-          customNumber: number || null,
-        }),
-      );
-    } catch {
-      setErrors({
-        storage:
-          "Could not start checkout. Please enable browser storage and try again.",
+      // Only selections are sent. The server calculates every price.
+      const order = await createOrder({
+        customerName: form.customerName.trim(),
+        phone: form.phone,
+        address: form.address.trim(),
+        deliveryArea: form.deliveryArea,
+        items: [
+          {
+            productId,
+            quantity,
+            size,
+            uclPatch: uclActive,
+            customName: name || null,
+            customNumber: number || null,
+          },
+        ],
+        meta: getMetaIds(),
       });
-      return;
+
+      setPlaced(order);
+
+      track(
+        "Purchase",
+        {
+          value: order.totalPrice,
+          currency: "BDT",
+          content_ids: order.items.map((i) => i.productId),
+          content_type: "product",
+          num_items: order.items.reduce((sum, i) => sum + i.quantity, 0),
+        },
+        order._id, // same id the server sends → Meta de-duplicates
+      );
+
+      requestAnimationFrame(() =>
+        rootRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }),
+      );
+    } catch (err) {
+      console.error("Create order error:", err);
+      setSubmitError(
+        err instanceof Error && err.message
+          ? err.message
+          : "Could not place your order. Please try again.",
+      );
+    } finally {
+      setSubmitting(false);
     }
-
-    track("AddToCart", {
-      content_ids: [productId],
-      content_name: productName,
-      content_type: "product",
-      value: total,
-      currency: "BDT",
-      num_items: quantity,
-    });
-
-    router.push("/checkout");
   };
 
   return (
-    <div className="space-y-5">
-      {/* Size */}
-      {needsSize && (
-        <div>
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-sm font-semibold">Size</span>
-            <SizeChart selectedSize={size} />
+    <div ref={rootRef} className="scroll-mt-24">
+      {placed ? (
+        /* ── Success ── */
+        <div className="space-y-4 rounded-2xl border border-green-600/30 bg-green-50 p-6 text-center dark:bg-green-950/20">
+          <div className="flex justify-center">
+            <div className="rounded-full bg-green-100 p-3">
+              <CheckCircle2 className="h-10 w-10 text-green-600" />
+            </div>
           </div>
 
-          <div
-            role="radiogroup"
-            aria-label="Select size"
-            className="flex flex-wrap gap-2"
-          >
-            {sizes.map((s) => {
-              const active = size === s;
-              return (
-                <button
-                  key={s}
-                  type="button"
-                  role="radio"
-                  aria-checked={active}
-                  onClick={() => {
-                    setSize(s);
-                    setErrors((e) => ({ ...e, size: undefined }));
-                  }}
-                  className={`h-11 min-w-14 rounded-xl border px-4 text-sm font-semibold transition-colors ${
-                    active
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-border bg-card hover:border-primary/50"
-                  }`}
-                >
-                  {s}
-                </button>
-              );
-            })}
+          <div>
+            <h2 className="text-xl font-bold">Order placed!</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Order #{placed._id.slice(-6).toUpperCase()}
+            </p>
           </div>
 
-          {chartRow && (
-            <p className="mt-2 text-sm text-muted-foreground">
-              Size {chartRow.size}: Chest {chartRow.chest} in · Length{" "}
-              {chartRow.length} in{" "}
-              <span className="text-xs">(1–2 in variation)</span>
-            </p>
-          )}
+          <p className="text-sm text-muted-foreground">
+            Thank you! We will call you shortly to confirm your order.
+          </p>
 
-          {errors.size && (
-            <p role="alert" className="mt-2 text-sm text-red-600">
-              {errors.size}
-            </p>
-          )}
+          <div className="space-y-1 rounded-xl bg-background/70 p-4 text-left text-sm">
+            <Row label="Delivery" value={placed.deliveryCharge} />
+            <Row
+              label="Total to pay (Cash on Delivery)"
+              value={placed.totalPrice}
+              strong
+            />
+          </div>
+
+          <div className="flex flex-col gap-3 pt-1 sm:flex-row">
+            <Link
+              href="/track-order"
+              className="flex h-12 flex-1 items-center justify-center rounded-xl bg-primary font-semibold text-primary-foreground hover:bg-primary/90"
+            >
+              Track Your Order
+            </Link>
+            <Link
+              href="/"
+              className="flex h-12 flex-1 items-center justify-center rounded-xl border border-border bg-background font-semibold hover:bg-secondary"
+            >
+              Continue Shopping
+            </Link>
+          </div>
         </div>
-      )}
-
-      {/* Add-ons: UCL patch + Name & Number side by side */}
-      {(uclAvailable || printAvailable) && (
-        <div className="space-y-2">
-          <span className="block text-sm font-semibold">
-            Customize{" "}
-            <span className="font-normal text-muted-foreground">
-              (optional)
-            </span>
-          </span>
-
-          <div
-            className={`grid gap-2 ${
-              uclAvailable && printAvailable ? "grid-cols-2" : "grid-cols-1"
-            }`}
-          >
-            {uclAvailable && (
-              <AddOn
-                title="UCL Patch"
-                description="Champions League sleeve patch"
-                price={uclPrice}
-                checked={uclPatch}
-                onToggle={() => setUclPatch((v) => !v)}
-              />
-            )}
-
-            {printAvailable && (
-              <AddOn
-                title="Name & Number"
-                description="Print on the back"
-                price={printPrice}
-                checked={printOn}
-                onToggle={() => {
-                  setPrintOn((v) => !v);
-                  setErrors((e) => ({ ...e, print: undefined }));
-                }}
-              />
-            )}
-          </div>
-
-          {/* Name / number inputs (full width, below the cards) */}
-          {printActive && (
-            <div className="rounded-xl border border-primary/30 bg-primary/5 p-3">
-              <div className="grid grid-cols-[1fr_5.5rem] gap-3">
-                <div>
-                  <label
-                    htmlFor={`${uid}-name`}
-                    className="mb-1 block text-xs font-medium text-muted-foreground"
-                  >
-                    Name (max 12 letters)
-                  </label>
-                  <input
-                    id={`${uid}-name`}
-                    value={customName}
-                    maxLength={12}
-                    autoComplete="off"
-                    placeholder="MESSI"
-                    onChange={(e) =>
-                      setCustomName(
-                        e.target.value
-                          .toUpperCase()
-                          .replace(/[^A-Z .'-]/g, "")
-                          .slice(0, 12),
-                      )
-                    }
-                    className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm uppercase tracking-wide focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                  />
-                </div>
-                <div>
-                  <label
-                    htmlFor={`${uid}-number`}
-                    className="mb-1 block text-xs font-medium text-muted-foreground"
-                  >
-                    Number
-                  </label>
-                  <input
-                    id={`${uid}-number`}
-                    value={customNumber}
-                    inputMode="numeric"
-                    maxLength={2}
-                    autoComplete="off"
-                    placeholder="10"
-                    onChange={(e) =>
-                      setCustomNumber(
-                        e.target.value.replace(/\D/g, "").slice(0, 2),
-                      )
-                    }
-                    className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                  />
-                </div>
+      ) : (
+        /* ── Order form ── */
+        <form onSubmit={handleSubmit} noValidate className="space-y-5">
+          {/* Size */}
+          {needsSize && (
+            <div id={`${uid}-size`} className="scroll-mt-24">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-sm font-semibold">Size</span>
+                <SizeChart selectedSize={size} />
               </div>
 
-              {quantity > 1 && (
-                <p className="mt-2 text-xs text-muted-foreground">
-                  The same name and number will be printed on all {quantity}{" "}
-                  jerseys.
+              <div
+                role="radiogroup"
+                aria-label="Select size"
+                className="flex flex-wrap gap-2"
+              >
+                {sizes.map((s) => {
+                  const active = size === s;
+                  return (
+                    <button
+                      key={s}
+                      type="button"
+                      role="radio"
+                      aria-checked={active}
+                      onClick={() => {
+                        setSize(s);
+                        setErrors((e) => ({ ...e, size: undefined }));
+                      }}
+                      className={`h-11 min-w-14 rounded-xl border px-4 text-sm font-semibold transition-colors ${
+                        active
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border bg-card hover:border-primary/50"
+                      }`}
+                    >
+                      {s}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {chartRow && (
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Size {chartRow.size}: Chest {chartRow.chest} in · Length{" "}
+                  {chartRow.length} in{" "}
+                  <span className="text-xs">(1–2 in variation)</span>
                 </p>
               )}
 
-              {errors.print && (
+              {errors.size && (
                 <p role="alert" className="mt-2 text-sm text-red-600">
-                  {errors.print}
+                  {errors.size}
                 </p>
               )}
             </div>
           )}
-        </div>
-      )}
 
-      {/* Quantity + WhatsApp + Call */}
-      <div>
-        <span className="mb-2 block text-sm font-semibold">Quantity</span>
-        <div className="flex items-center gap-2">
-          <QuantitySelector quantity={quantity} setQuantity={setQuantity} />
+          {/* Add-ons: UCL patch + Name & Number side by side */}
+          {(uclAvailable || printAvailable) && (
+            <div id={`${uid}-print`} className="scroll-mt-24 space-y-2">
+              <span className="block text-sm font-semibold">
+                Customize{" "}
+                <span className="font-normal text-muted-foreground">(optional)</span>
+              </span>
 
-          <div className="ml-auto flex items-center gap-2">
-            <a
-              href={whatsappHref}
-              onClick={() => track("Contact", { content_name: productName })}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Order on WhatsApp"
-              className="flex h-11 items-center justify-center gap-2 rounded-xl border border-green-600/40 px-3 text-sm font-semibold text-green-600 transition-colors hover:bg-green-50 sm:px-4"
-            >
-              <WhatsAppIcon />
-              <span className="hidden sm:inline">WhatsApp</span>
-            </a>
+              <div
+                className={`grid gap-2 ${
+                  uclAvailable && printAvailable ? "grid-cols-2" : "grid-cols-1"
+                }`}
+              >
+                {uclAvailable && (
+                  <AddOn
+                    title="UCL Patch"
+                    description="Champions League sleeve patch"
+                    price={uclPrice}
+                    checked={uclPatch}
+                    onToggle={() => setUclPatch((v) => !v)}
+                  />
+                )}
 
-            <a
-              href={callHref}
-              onClick={() => track("Contact", { content_name: productName })}
-              aria-label="Call us"
-              className="flex h-11 items-center justify-center gap-2 rounded-xl border border-border px-3 text-sm font-semibold text-foreground transition-colors hover:bg-secondary sm:px-4"
-            >
-              <Phone className="h-5 w-5" />
-              <span className="hidden sm:inline">Call</span>
-            </a>
+                {printAvailable && (
+                  <AddOn
+                    title="Name & Number"
+                    description="Print on the back"
+                    price={printPrice}
+                    checked={printOn}
+                    onToggle={() => {
+                      setPrintOn((v) => !v);
+                      setErrors((e) => ({ ...e, print: undefined }));
+                    }}
+                  />
+                )}
+              </div>
+
+              {printActive && (
+                <div className="rounded-xl border border-primary/30 bg-primary/5 p-3">
+                  <div className="grid grid-cols-[1fr_5.5rem] gap-3">
+                    <div>
+                      <label
+                        htmlFor={`${uid}-name`}
+                        className="mb-1 block text-xs font-medium text-muted-foreground"
+                      >
+                        Name (max 12 letters)
+                      </label>
+                      <input
+                        id={`${uid}-name`}
+                        value={customName}
+                        maxLength={12}
+                        autoComplete="off"
+                        placeholder="MESSI"
+                        onChange={(e) =>
+                          setCustomName(
+                            e.target.value
+                              .toUpperCase()
+                              .replace(/[^A-Z .'-]/g, "")
+                              .slice(0, 12),
+                          )
+                        }
+                        className="h-11 w-full rounded-xl border border-border bg-background px-3 text-base uppercase tracking-wide focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary md:text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor={`${uid}-number`}
+                        className="mb-1 block text-xs font-medium text-muted-foreground"
+                      >
+                        Number
+                      </label>
+                      <input
+                        id={`${uid}-number`}
+                        value={customNumber}
+                        inputMode="numeric"
+                        maxLength={2}
+                        autoComplete="off"
+                        placeholder="10"
+                        onChange={(e) =>
+                          setCustomNumber(e.target.value.replace(/\D/g, "").slice(0, 2))
+                        }
+                        className="h-11 w-full rounded-xl border border-border bg-background px-3 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary md:text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  {quantity > 1 && (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      The same name and number will be printed on all {quantity}{" "}
+                      jerseys.
+                    </p>
+                  )}
+
+                  {errors.print && (
+                    <p role="alert" className="mt-2 text-sm text-red-600">
+                      {errors.print}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Quantity + WhatsApp + Call */}
+          <div>
+            <span className="mb-2 block text-sm font-semibold">Quantity</span>
+            <div className="flex items-center gap-2">
+              <QuantitySelector quantity={quantity} setQuantity={setQuantity} />
+
+              <div className="ml-auto flex items-center gap-2">
+                <a
+                  href={whatsappHref}
+                  onClick={() => track("Contact", { content_name: productName })}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Order on WhatsApp"
+                  className="flex h-11 items-center justify-center gap-2 rounded-xl border border-green-600/40 px-3 text-sm font-semibold text-green-600 transition-colors hover:bg-green-50 sm:px-4"
+                >
+                  <WhatsAppIcon />
+                  <span className="hidden sm:inline">WhatsApp</span>
+                </a>
+
+                <a
+                  href={callHref}
+                  onClick={() => track("Contact", { content_name: productName })}
+                  aria-label="Call us"
+                  className="flex h-11 items-center justify-center gap-2 rounded-xl border border-border px-3 text-sm font-semibold text-foreground transition-colors hover:bg-secondary sm:px-4"
+                >
+                  <Phone className="h-5 w-5" />
+                  <span className="hidden sm:inline">Call</span>
+                </a>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
 
-      {/* Price summary */}
-      <div className="space-y-1.5 rounded-xl bg-secondary/60 p-4 text-sm">
-        <Row label={`Jersey × ${quantity}`} value={basePrice * quantity} />
-        {uclActive && (
-          <Row label={`UCL patch × ${quantity}`} value={uclPrice * quantity} />
-        )}
-        {printActive && (
-          <Row
-            label={`Name & number × ${quantity}`}
-            value={printPrice * quantity}
-          />
-        )}
-        <div className="flex justify-between border-t border-border/60 pt-2 text-base font-bold">
-          <span>Total</span>
-          <span className="text-primary">{money(total)}</span>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          Delivery charge is added at checkout.
-        </p>
-      </div>
+          {/* Delivery info (single-page checkout) */}
+          <div
+            onFocusCapture={handleFormStart}
+            className="space-y-4 rounded-2xl border border-border/60 bg-card p-4 md:p-5"
+          >
+            <h2 className="flex items-center gap-2 text-sm font-semibold">
+              <MapPin className="h-5 w-5 text-primary" /> Delivery Info
+            </h2>
 
-      {/* Order */}
-      <div>
-        <button
-          type="button"
-          onClick={handleOrder}
-          disabled={outOfStock}
-          className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-base font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <ShoppingBag size={18} />
-          {outOfStock ? "Out of Stock" : "Order Now"}
-        </button>
+            <Field id={`${uid}-cname`} label="Full name" error={errors.customerName}>
+              <input
+                id={`${uid}-cname`}
+                autoComplete="name"
+                placeholder="Your name"
+                value={form.customerName}
+                onChange={(e) => {
+                  setForm({ ...form, customerName: e.target.value });
+                  setErrors((x) => ({ ...x, customerName: undefined }));
+                }}
+                aria-invalid={Boolean(errors.customerName)}
+                className={inputClass(Boolean(errors.customerName))}
+              />
+            </Field>
 
-        {errors.storage && (
-          <p role="alert" className="mt-2 text-sm text-red-600">
-            {errors.storage}
-          </p>
-        )}
-      </div>
+            <Field id={`${uid}-phone`} label="Mobile number" error={errors.phone}>
+              <input
+                id={`${uid}-phone`}
+                type="tel"
+                inputMode="numeric"
+                autoComplete="tel"
+                placeholder="01XXXXXXXXX"
+                value={form.phone}
+                onChange={(e) => {
+                  setForm({ ...form, phone: normalizePhone(e.target.value) });
+                  setErrors((x) => ({ ...x, phone: undefined }));
+                }}
+                aria-invalid={Boolean(errors.phone)}
+                className={inputClass(Boolean(errors.phone))}
+              />
+            </Field>
+
+            <Field id={`${uid}-address`} label="Full address" error={errors.address}>
+              <textarea
+                id={`${uid}-address`}
+                rows={3}
+                autoComplete="street-address"
+                placeholder="House, road, area, thana, district"
+                value={form.address}
+                onChange={(e) => {
+                  setForm({ ...form, address: e.target.value });
+                  setErrors((x) => ({ ...x, address: undefined }));
+                }}
+                aria-invalid={Boolean(errors.address)}
+                className={inputClass(Boolean(errors.address))}
+              />
+            </Field>
+
+            {/* Delivery area */}
+            <div>
+              <span className="mb-1.5 block text-sm font-medium">Delivery area</span>
+              <div
+                role="radiogroup"
+                aria-label="Delivery area"
+                className="grid grid-cols-2 gap-3"
+              >
+                {(Object.keys(DELIVERY) as DeliveryArea[]).map((key) => {
+                  const active = form.deliveryArea === key;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      role="radio"
+                      aria-checked={active}
+                      onClick={() => setForm({ ...form, deliveryArea: key })}
+                      className={`rounded-xl border p-3 text-left transition-colors ${
+                        active
+                          ? "border-primary bg-primary/5"
+                          : "border-border bg-card hover:border-primary/50"
+                      }`}
+                    >
+                      <span className="block text-sm font-semibold">
+                        {DELIVERY[key].label}
+                      </span>
+                      <span className="block text-xs text-muted-foreground">
+                        {DELIVERY[key].hint}
+                      </span>
+                      <span className="mt-1 block text-sm font-bold text-primary">
+                        {money(DELIVERY[key].charge)}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Price summary */}
+          <div className="space-y-1.5 rounded-xl bg-secondary/60 p-4 text-sm">
+            <Row label={`Jersey × ${quantity}`} value={basePrice * quantity} />
+            {uclActive && (
+              <Row label={`UCL patch × ${quantity}`} value={uclPrice * quantity} />
+            )}
+            {printActive && (
+              <Row
+                label={`Name & number × ${quantity}`}
+                value={printPrice * quantity}
+              />
+            )}
+            <Row label="Delivery" value={deliveryCharge} />
+            <Row label="Total (Cash on Delivery)" value={total} strong />
+          </div>
+
+          {/* Place order */}
+          <div>
+            {submitError && (
+              <p
+                role="alert"
+                className="mb-3 rounded-xl bg-red-500/10 p-3 text-sm text-red-600"
+              >
+                {submitError}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={submitting || outOfStock}
+              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-base font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {outOfStock ? (
+                "Out of Stock"
+              ) : submitting ? (
+                <>
+                  <Loader2 className="h-5 w-5 animate-spin" /> Placing order…
+                </>
+              ) : (
+                <>
+                  <ShoppingBag size={18} /> Place Order · {money(total)}
+                </>
+              )}
+            </button>
+
+            <p className="mt-2 text-center text-xs text-muted-foreground">
+              Final price is confirmed by our system when you place the order.
+            </p>
+          </div>
+        </form>
+      )}
     </div>
   );
 }

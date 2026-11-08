@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { ShoppingBag } from "lucide-react";
 
 import { getProductsByCategory } from "@/services/api";
 import { Product } from "@/types/product";
-import JerseyCard from "@/components/Common/JerseyCard";
+import CategoryProducts from "@/components/Common/CategoryProducts";
 
 // ✅ Next.js 15: params is a Promise
 interface Props {
@@ -74,30 +75,18 @@ export default async function CategoryPage({ params }: Props) {
       <div className="bg-linear-to-b from-secondary/50 to-background border-b">
         <div className="container py-2 md:py-2">
           <h1 className="font-display text-2xl md:text-5xl font-extrabold mb-3">
-            {title} 
+            {title}
           </h1>
           <p className="text-muted-foreground text-sm md:text-xl">{description}</p>
         </div>
       </div>
 
-      {/* ── Product Grid ── */}
+      {/* ── Filters + Product Grid ── */}
       <div className="container py-2 flex-1">
         {products.length > 0 ? (
-          <>
-            <p className="text-sm text-muted-foreground mb-4">
-              {products.length} {products.length === 1 ? "item" : "items"}
-            </p>
-
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4 xl:grid-cols-5">
-              {products.map((product, i) => (
-                <JerseyCard
-                  key={product._id}
-                  product={product}
-                  priority={i < 4}
-                />
-              ))}
-            </div>
-          </>
+          <Suspense fallback={null}>
+            <CategoryProducts products={products} />
+          </Suspense>
         ) : (
           <div className="text-center py-20">
             <ShoppingBag className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />

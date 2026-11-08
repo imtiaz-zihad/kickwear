@@ -1,7 +1,7 @@
 import { MapPin, Phone, Truck } from "lucide-react";
 import Link from "next/link";
 
-const WHATSAPP_NUMBER = "8801958403338";
+const WHATSAPP_NUMBER = "88018940302115";
 const FB_PAGE = "https://www.facebook.com/kickwear02";
 const INSTAGRAM_URL = "https://www.instagram.com/kick__wear";
 // const TIKTOK_URL = "https://www.tiktok.com/@sb.collection.bd";
