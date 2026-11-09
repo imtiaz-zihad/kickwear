@@ -23,6 +23,8 @@ const ALLOWED_FIELDS = [
   "description",
   "stock",
   "addOns",
+  "availability",
+  "preorderNote",
 ];
 
 const SORTS = {
@@ -56,6 +58,14 @@ const flattenAddOns = (update) => {
     if (a.enabled !== undefined) update[`addOns.${key}.enabled`] = Boolean(a.enabled);
     if (a.price !== undefined) update[`addOns.${key}.price`] = Number(a.price);
   }
+};
+
+// Pre-order note only makes sense on pre-order products
+const normalizeAvailability = (data) => {
+  if (data.preorderNote !== undefined) {
+    data.preorderNote = String(data.preorderNote).trim().slice(0, 100);
+  }
+  if (data.availability === "in-stock") data.preorderNote = "";
 };
 
 const toInt = (value, fallback, min = 1, max = Infinity) => {
@@ -96,10 +106,11 @@ const sendError = (res, err) => {
 // Query params:
 //   category=club-jersey   subcategory=barcelona   sleeve=half|full
 //   size=XL   featured=true   search=barca   sort=newest|price-asc|price-desc
+//   availability=in-stock|preorder
 //   page=1   limit=10
 exports.getProducts = async (req, res) => {
   try {
-    const { category, subcategory, sleeve, size, search, featured, sort } =
+    const { category, subcategory, sleeve, size, search, featured, sort, availability } =
       req.query;
 
     const page = toInt(req.query.page, 1);
@@ -116,6 +127,13 @@ exports.getProducts = async (req, res) => {
     if (sleeve) query.sleeve = String(sleeve).toLowerCase();
     if (size) query.sizes = String(size).toUpperCase(); // matches array element
     if (featured === "true") query.isFeatured = true;
+
+    if (availability === "preorder") {
+      query.availability = "preorder";
+    } else if (availability === "in-stock") {
+      // old products have no availability field, so they count as in-stock
+      query.availability = { $ne: "preorder" };
+    }
 
     // Partial, case-insensitive name match ("barca" finds "Barcelona Home")
     if (search) {
@@ -165,6 +183,7 @@ exports.getSingleProduct = async (req, res) => {
 exports.addProduct = async (req, res) => {
   try {
     const data = pickAllowed(req.body);
+    normalizeAvailability(data);
 
     const original = Number(data.originalPrice);
     const discounted = Number(data.discountedPrice);
@@ -197,6 +216,7 @@ exports.updateProduct = async (req, res) => {
 
     const update = pickAllowed(req.body);
     flattenAddOns(update);
+    normalizeAvailability(update);
 
     // Re-validate and recalculate discount if either price changes
     if (update.originalPrice !== undefined || update.discountedPrice !== undefined) {

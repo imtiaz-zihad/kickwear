@@ -1,5 +1,7 @@
 export type AddOn = { enabled?: boolean; price?: number };
 
+export type Availability = "in-stock" | "preorder";
+
 export type Product = {
   _id: string;
   name: string;
@@ -16,6 +18,8 @@ export type Product = {
   description?: string;
   isFeatured?: boolean;
   addOns?: { uclPatch?: AddOn; customPrint?: AddOn };
+  availability?: Availability;
+  preorderNote?: string;
 };
 
 export type FormState = {
@@ -35,6 +39,8 @@ export type FormState = {
   uclPrice: string;
   printEnabled: boolean;
   printPrice: string;
+  availability: Availability;
+  preorderNote: string;
 };
 
 export type SetField = <K extends keyof FormState>(key: K, value: FormState[K]) => void;
@@ -133,6 +139,8 @@ export const emptyForm = (): FormState => ({
   uclPrice: String(DEFAULT_ADDON_PRICE),
   printEnabled: false,
   printPrice: String(DEFAULT_ADDON_PRICE),
+  availability: "in-stock",
+  preorderNote: "",
 });
 
 export const formFromProduct = (p: Product): FormState => ({
@@ -152,4 +160,6 @@ export const formFromProduct = (p: Product): FormState => ({
   uclPrice: String(p.addOns?.uclPatch?.price ?? DEFAULT_ADDON_PRICE),
   printEnabled: p.addOns?.customPrint?.enabled === true,
   printPrice: String(p.addOns?.customPrint?.price ?? DEFAULT_ADDON_PRICE),
+  availability: p.availability === "preorder" ? "preorder" : "in-stock",
+  preorderNote: p.preorderNote ?? "",
 });

@@ -46,6 +46,11 @@ const orderSchema = new mongoose.Schema(
     // where the order came from (web = website checkout)
     source: { type: String, enum: SOURCES, default: "web" },
 
+    // pre-order: the product is not in stock yet (all items in the order are pre-order)
+    isPreorder: { type: Boolean, default: false },
+    // snapshot of the product's note at order time, e.g. "Delivery 20-25 Nov"
+    preorderNote: { type: String, default: "" },
+
     size: { type: String, default: null }, // legacy (old orders)
 
     // set when an admin edits the order
@@ -59,6 +64,7 @@ const orderSchema = new mongoose.Schema(
 orderSchema.index({ createdAt: -1 });
 orderSchema.index({ phone: 1, createdAt: -1 });
 orderSchema.index({ status: 1, createdAt: -1 });
+orderSchema.index({ isPreorder: 1, createdAt: -1 });
 
 module.exports = mongoose.model("Order", orderSchema);
 module.exports.STATUSES = STATUSES;

@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 
 const SIZES = ["S", "M", "L", "XL", "2XL"];
 const SLEEVES = ["half", "full"];
+const AVAILABILITY = ["in-stock", "preorder"];
 
 const productSchema = new mongoose.Schema(
   {
@@ -51,6 +52,11 @@ const productSchema = new mongoose.Schema(
     isFeatured: { type: Boolean, default: false },
     description: String,
     stock: { type: Number, default: 1 },
+
+    // "in-stock" = normal product, "preorder" = can be ordered even at stock 0
+    availability: { type: String, enum: AVAILABILITY, default: "in-stock" },
+    // shown to customers on pre-order products, e.g. "Delivery 20-25 Nov"
+    preorderNote: { type: String, trim: true, maxlength: 100, default: "" },
   },
   { timestamps: true } // createdAt / updatedAt → "newest first" sorting
 );
@@ -59,7 +65,9 @@ const productSchema = new mongoose.Schema(
 productSchema.index({ category: 1, subcategory: 1 }); // category page + team filter
 productSchema.index({ isFeatured: 1 });
 productSchema.index({ createdAt: -1 });
+productSchema.index({ availability: 1 });
 
 module.exports = mongoose.model("Product", productSchema);
 module.exports.SIZES = SIZES;
 module.exports.SLEEVES = SLEEVES;
+module.exports.AVAILABILITY = AVAILABILITY;

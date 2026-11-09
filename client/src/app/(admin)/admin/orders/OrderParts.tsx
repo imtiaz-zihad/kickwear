@@ -2,7 +2,15 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { useState } from "react";
-import { Copy, Loader2, Pencil, Phone, MessageCircle, ShoppingBag, X } from "lucide-react";
+import {
+  Copy,
+  Loader2,
+  Pencil,
+  Phone,
+  MessageCircle,
+  ShoppingBag,
+  X,
+} from "lucide-react";
 import {
   SOURCE_LABEL,
   STATUSES,
@@ -109,13 +117,20 @@ export function OrderModal({
   };
 
   const setField = (i: number, key: keyof Draft, value: string) =>
-    setDraft((prev) => prev.map((d, idx) => (idx === i ? { ...d, [key]: value } : d)));
+    setDraft((prev) =>
+      prev.map((d, idx) => (idx === i ? { ...d, [key]: value } : d)),
+    );
 
   // live totals while editing
   const previewSubtotal = editing
-    ? draft.reduce((s, d) => s + (Number(d.price) || 0) * (Number(d.quantity) || 0), 0)
+    ? draft.reduce(
+        (s, d) => s + (Number(d.price) || 0) * (Number(d.quantity) || 0),
+        0,
+      )
     : selected.totalPrice - selected.deliveryCharge;
-  const previewDelivery = editing ? Number(delivery) || 0 : selected.deliveryCharge;
+  const previewDelivery = editing
+    ? Number(delivery) || 0
+    : selected.deliveryCharge;
 
   const save = async () => {
     setErr("");
@@ -126,14 +141,20 @@ export function OrderModal({
       price: Number(d.price),
     }));
 
-    if (items.some((i) => !Number.isInteger(i.quantity) || i.quantity < 1 || i.quantity > 20)) {
+    if (
+      items.some(
+        (i) =>
+          !Number.isInteger(i.quantity) || i.quantity < 1 || i.quantity > 20,
+      )
+    ) {
       return setErr("Quantity must be 1–20");
     }
     if (items.some((i) => !Number.isFinite(i.price) || i.price < 0)) {
       return setErr("Enter a valid price");
     }
     const d = Number(delivery);
-    if (!Number.isFinite(d) || d < 0) return setErr("Enter a valid delivery charge");
+    if (!Number.isFinite(d) || d < 0)
+      return setErr("Enter a valid delivery charge");
 
     setSaving(true);
     try {
@@ -173,8 +194,15 @@ export function OrderModal({
             <Chip accent>{SOURCE_LABEL[selected.source]}</Chip>
           )}
           {selected.edited && <Chip>Edited</Chip>}
+          {selected.isPreorder && <Chip accent>Pre-order</Chip>}
         </div>
 
+        {selected.isPreorder && selected.preorderNote && (
+          <p className="mb-4 rounded-xl bg-amber-500/10 px-3 py-2 text-sm font-medium text-amber-700">
+            Pre-order · {selected.preorderNote}
+          </p>
+        )}
+        
         {/* Customer */}
         <div className="mb-5 grid grid-cols-2 gap-3 text-sm">
           <div className="rounded-xl bg-secondary/60 p-3">
@@ -212,7 +240,9 @@ export function OrderModal({
             <p className="text-xs text-muted-foreground">Area</p>
             <p
               className={`font-semibold ${
-                getArea(selected) === "dhaka" ? "text-green-600" : "text-red-500"
+                getArea(selected) === "dhaka"
+                  ? "text-green-600"
+                  : "text-red-500"
               }`}
             >
               {areaLabel(getArea(selected))}
@@ -224,7 +254,9 @@ export function OrderModal({
             <select
               value={selected.status}
               disabled={updatingId === selected._id}
-              onChange={(e) => onChangeStatus(selected, e.target.value as OrderStatus)}
+              onChange={(e) =>
+                onChangeStatus(selected, e.target.value as OrderStatus)
+              }
               className={`h-8 w-full rounded-lg border border-border px-2 text-sm font-medium disabled:opacity-50 ${
                 STATUS_BADGE[selected.status] ?? ""
               }`}
@@ -266,7 +298,11 @@ export function OrderModal({
               <div key={i} className="flex gap-3">
                 <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-border/60 bg-secondary">
                   {item.image ? (
-                    <img src={item.image} alt={item.name} className="h-full w-full object-cover" />
+                    <img
+                      src={item.image}
+                      alt={item.name}
+                      className="h-full w-full object-cover"
+                    />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-muted-foreground">
                       <ShoppingBag className="h-5 w-5 opacity-40" />
@@ -288,7 +324,10 @@ export function OrderModal({
                         >
                           <option value="">–</option>
                           {Array.from(
-                            new Set([...(draft[i].size ? [draft[i].size] : []), ...SIZE_OPTIONS]),
+                            new Set([
+                              ...(draft[i].size ? [draft[i].size] : []),
+                              ...SIZE_OPTIONS,
+                            ]),
                           ).map((s) => (
                             <option key={s} value={s}>
                               {s}
@@ -303,7 +342,9 @@ export function OrderModal({
                           min={1}
                           max={20}
                           value={draft[i].quantity}
-                          onChange={(e) => setField(i, "quantity", e.target.value)}
+                          onChange={(e) =>
+                            setField(i, "quantity", e.target.value)
+                          }
                           className={`${inputCls} mt-0.5`}
                         />
                       </label>
@@ -359,7 +400,9 @@ export function OrderModal({
           </div>
           <div className="flex justify-between text-base font-semibold">
             <span>Total (Cash on Delivery)</span>
-            <span className="text-primary">{money(previewSubtotal + previewDelivery)}</span>
+            <span className="text-primary">
+              {money(previewSubtotal + previewDelivery)}
+            </span>
           </div>
           {selected.edited && selected.originalTotal != null && !editing && (
             <p className="text-xs text-muted-foreground">
@@ -371,7 +414,10 @@ export function OrderModal({
         {editing && (
           <div className="mt-4 space-y-3">
             {err && (
-              <p role="alert" className="rounded-lg bg-red-500/10 p-3 text-sm text-red-600">
+              <p
+                role="alert"
+                className="rounded-lg bg-red-500/10 p-3 text-sm text-red-600"
+              >
                 {err}
               </p>
             )}

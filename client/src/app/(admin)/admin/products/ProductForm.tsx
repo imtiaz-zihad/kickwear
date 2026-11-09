@@ -48,6 +48,7 @@ export default function ProductForm({
   const discounted = Number(form.discountedPrice);
   const pricesOk = original > 0 && discounted > 0 && discounted <= original;
   const discountPct = pricesOk ? Math.round(((original - discounted) / original) * 100) : 0;
+  const isPreorder = form.availability === "preorder";
 
   const toggleSize = (s: string) =>
     set("sizes", form.sizes.includes(s) ? form.sizes.filter((x) => x !== s) : SIZES.filter((x) => form.sizes.includes(x) || x === s));
@@ -99,6 +100,8 @@ export default function ProductForm({
       description: form.description.trim(),
       stock: Number(form.stock),
       isFeatured: form.isFeatured,
+      availability: form.availability,
+      preorderNote: isPreorder ? form.preorderNote.trim() : "",
       addOns: {
         uclPatch: { enabled: form.uclEnabled, price: Number(form.uclPrice) || DEFAULT_ADDON_PRICE },
         customPrint: { enabled: form.printEnabled, price: Number(form.printPrice) || DEFAULT_ADDON_PRICE },
@@ -306,10 +309,62 @@ export default function ProductForm({
 
           <AddOnsSection form={form} set={set} />
 
+          <Section title="Availability">
+            <div className="grid grid-cols-2 gap-3">
+              {(
+                [
+                  { value: "in-stock", title: "In stock", hint: "Normal product" },
+                  { value: "preorder", title: "Pre-order", hint: "Not in stock yet" },
+                ] as const
+              ).map((opt) => {
+                const active = form.availability === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    onClick={() => set("availability", opt.value)}
+                    className={`rounded-xl border p-3 text-left transition-colors ${
+                      active
+                        ? "border-primary bg-primary/5"
+                        : "border-border bg-background hover:border-primary/50"
+                    }`}
+                  >
+                    <span className="block text-sm font-semibold">{opt.title}</span>
+                    <span className="block text-xs text-muted-foreground">{opt.hint}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {isPreorder && (
+              <div className="space-y-2 rounded-xl border border-amber-500/40 bg-amber-500/5 p-4">
+                <div>
+                  <Label htmlFor="p-preorder-note">Expected delivery (shown to customers)</Label>
+                  <input
+                    id="p-preorder-note"
+                    value={form.preorderNote}
+                    maxLength={100}
+                    onChange={(e) => set("preorderNote", e.target.value)}
+                    placeholder="Delivery 20-25 Nov"
+                    className={field}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Customers can order even when stock is 0. Pre-order items are placed as a separate
+                  order (not mixed with in-stock jerseys).
+                </p>
+              </div>
+            )}
+          </Section>
+
           <Section title="Stock & visibility">
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <Label htmlFor="p-stock">Stock (0 = sold out)</Label>
+                <Label htmlFor="p-stock">
+                  {isPreorder ? "Stock (ignored for pre-order)" : "Stock (0 = sold out)"}
+                </Label>
                 <input
                   id="p-stock"
                   type="number"

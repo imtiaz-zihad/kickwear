@@ -65,6 +65,8 @@ export type Order = {
   status: OrderStatus;
   source?: OrderSource;
   edited?: boolean;
+  isPreorder?: boolean;
+  preorderNote?: string;
   originalTotal?: number | null;
   createdAt: string;
 };
@@ -79,7 +81,8 @@ export const money = (n: number) => `৳${(n ?? 0).toLocaleString()}`;
 export const shortId = (o: Order) => o._id.slice(-6).toUpperCase();
 export const getArea = (o: Order) =>
   o.deliveryArea ?? (o.deliveryCharge <= 60 ? "dhaka" : "outside");
-export const areaLabel = (a: string) => (a === "dhaka" ? "Dhaka" : "Outside Dhaka");
+export const areaLabel = (a: string) =>
+  a === "dhaka" ? "Dhaka" : "Outside Dhaka";
 export const itemSize = (o: Order, i: OrderItem) => i.size ?? o.size ?? null;
 export const printText = (i: OrderItem) =>
   [i.customName, i.customNumber].filter(Boolean).join(" ");
@@ -110,6 +113,7 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
 
   const data = await res.json().catch(() => null);
-  if (!res.ok) throw new Error(data?.message || `Request failed (${res.status})`);
+  if (!res.ok)
+    throw new Error(data?.message || `Request failed (${res.status})`);
   return data as T;
 }
