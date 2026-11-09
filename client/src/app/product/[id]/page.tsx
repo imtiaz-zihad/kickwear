@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Banknote, ChevronRight, Truck } from "lucide-react";
+import { Banknote, ChevronRight, Clock, Truck } from "lucide-react";
 import { getSingleProduct } from "@/services/api";
 import { Product, Sleeve } from "@/types/product";
 import OrderButton from "@/components/Common/OrderButton";
@@ -38,9 +38,11 @@ export async function generateMetadata({
   const product = await getProduct(id);
   if (!product) return { title: "Product not found" };
 
+  const verb = product.availability === "preorder" ? "Pre-order" : "Buy";
+
   return {
     title: product.name,
-    description: `Buy ${product.name} for ৳${product.discountedPrice.toLocaleString()}. Cash on delivery all over Bangladesh.`,
+    description: `${verb} ${product.name} for ৳${product.discountedPrice.toLocaleString()}. Cash on delivery all over Bangladesh.`,
     openGraph: {
       title: product.name,
       images: product.images?.[0] ? [product.images[0]] : [],
@@ -67,7 +69,10 @@ export default async function ProductDetails({
         : 0;
 
   const sleeve = product.sleeve ? SLEEVE_LABEL[product.sleeve] : null;
-  const outOfStock = product.stock !== undefined && product.stock <= 0;
+  const isPreorder = product.availability === "preorder";
+  // pre-order products can be ordered even when stock is 0
+  const outOfStock =
+    !isPreorder && product.stock !== undefined && product.stock <= 0;
 
   // Only show rows that have data
   const specs = [
@@ -120,6 +125,12 @@ export default async function ProductDetails({
             >
               {formatSlug(product.category)}
             </Link>
+            {isPreorder && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-500 px-3 py-1 text-xs font-bold text-white">
+                <Clock className="h-3 w-3" />
+                Pre-order
+              </span>
+            )}
             {sleeve && (
               <span className="rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-foreground">
                 {sleeve}
@@ -170,6 +181,8 @@ export default async function ProductDetails({
             sizes={product.sizes ?? []}
             addOns={product.addOns}
             outOfStock={outOfStock}
+            preorder={isPreorder}
+            preorderNote={product.preorderNote ?? ""}
           />
 
           {/* Trust cards */}

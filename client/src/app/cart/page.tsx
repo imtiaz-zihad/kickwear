@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useId, useRef, useState } from "react";
 import {
   CheckCircle2,
+  Clock,
   Loader2,
   MapPin,
   Minus,
@@ -27,10 +28,7 @@ const normalizePhone = (v: string) => {
 };
 
 // Display only. The server recalculates the real prices.
-const DELIVERY: Record<
-  DeliveryArea,
-  { label: string; hint: string; charge: number }
-> = {
+const DELIVERY: Record<DeliveryArea, { label: string; hint: string; charge: number }> = {
   dhaka: { label: "Inside Dhaka", hint: "Dhaka city", charge: 70 },
   outside: { label: "Outside Dhaka", hint: "All over Bangladesh", charge: 130 },
 };
@@ -106,11 +104,16 @@ export default function CartPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [placed, setPlaced] = useState<Order | null>(null);
+  const [placedPreorder, setPlacedPreorder] = useState(false);
 
   const subtotal = lines.reduce((s, l) => s + lineTotal(l), 0);
   const totalQty = lines.reduce((s, l) => s + l.quantity, 0);
   const deliveryCharge = DELIVERY[form.deliveryArea].charge;
   const total = subtotal + deliveryCharge;
+
+  // The cart never mixes pre-order and in-stock jerseys
+  const isPreorder = lines.length > 0 && lines[0].preorder;
+  const preorderNote = lines.find((l) => l.preorderNote)?.preorderNote ?? "";
 
   // One-line summary of the whole cart for the "abandoned checkout" list
   const summary = lines
@@ -122,7 +125,7 @@ export default function CartPage() {
     enabled: ready && lines.length > 0 && !placed,
     form,
     productId: lines[0]?.productId,
-    productName: summary,
+    productName: isPreorder ? `[Pre-order] ${summary}`.slice(0, 190) : summary,
     size: null,
     quantity: totalQty,
   });
@@ -191,6 +194,7 @@ export default function CartPage() {
         meta: getMetaIds(),
       });
 
+      setPlacedPreorder(isPreorder);
       setPlaced(order);
       clear();
 
@@ -241,7 +245,9 @@ export default function CartPage() {
           </div>
 
           <div>
-            <h1 className="text-2xl font-bold">Order placed!</h1>
+            <h1 className="text-2xl font-bold">
+              {placedPreorder ? "Pre-order placed!" : "Order placed!"}
+            </h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Order #{placed._id.slice(-6).toUpperCase()} ·{" "}
               {placed.items.reduce((s, i) => s + i.quantity, 0)} items
@@ -249,7 +255,9 @@ export default function CartPage() {
           </div>
 
           <p className="text-sm text-muted-foreground">
-            Thank you! We will call you shortly to confirm your order.
+            {placedPreorder
+              ? "Thank you! We will call you shortly to confirm your pre-order."
+              : "Thank you! We will call you shortly to confirm your order."}
           </p>
 
           <div className="space-y-1 rounded-xl bg-secondary/60 p-4 text-left">
@@ -309,11 +317,22 @@ export default function CartPage() {
         </span>
       </h1>
 
-      <form
-        onSubmit={handleSubmit}
-        noValidate
-        className="grid gap-8 lg:grid-cols-5"
-      >
+      {isPreorder && (
+        <div className="mb-6 flex gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4">
+          <Clock className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+          <div className="text-sm">
+            <p className="font-semibold text-amber-700">
+              Pre-order{preorderNote ? ` · ${preorderNote}` : ""}
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              These jerseys are not in stock yet. We will call you to confirm, and
+              deliver after they arrive. In-stock jerseys must be ordered separately.
+            </p>
+          </div>
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} noValidate className="grid gap-8 lg:grid-cols-5">
         {/* LEFT: items + delivery info */}
         <div className="space-y-5 lg:col-span-3">
           {/* Items */}
@@ -361,6 +380,11 @@ export default function CartPage() {
                   </div>
 
                   <div className="mt-1.5 flex flex-wrap gap-1.5 text-xs">
+                    {l.preorder && (
+                      <span className="rounded-full bg-amber-500/15 px-2 py-0.5 font-semibold text-amber-700">
+                        Pre-order
+                      </span>
+                    )}
                     {l.size && (
                       <span className="rounded-full bg-secondary px-2 py-0.5 font-medium">
                         Size {l.size}
@@ -373,10 +397,7 @@ export default function CartPage() {
                     )}
                     {hasPrint(l) && (
                       <span className="rounded-full bg-primary/10 px-2 py-0.5 font-medium text-primary">
-                        Print:{" "}
-                        {[l.customName, l.customNumber]
-                          .filter(Boolean)
-                          .join(" ")}
+                        Print: {[l.customName, l.customNumber].filter(Boolean).join(" ")}
                       </span>
                     )}
                   </div>
@@ -406,9 +427,7 @@ export default function CartPage() {
                       </button>
                     </div>
 
-                    <span className="font-bold text-primary">
-                      {money(lineTotal(l))}
-                    </span>
+                    <span className="font-bold text-primary">{money(lineTotal(l))}</span>
                   </div>
                 </div>
               </li>
@@ -431,11 +450,7 @@ export default function CartPage() {
               <MapPin className="h-5 w-5 text-primary" /> Delivery Info
             </h2>
 
-            <Field
-              id={`${uid}-name`}
-              label="Full name"
-              error={errors.customerName}
-            >
+            <Field id={`${uid}-name`} label="Full name" error={errors.customerName}>
               <input
                 id={`${uid}-name`}
                 autoComplete="name"
@@ -450,11 +465,7 @@ export default function CartPage() {
               />
             </Field>
 
-            <Field
-              id={`${uid}-phone`}
-              label="Mobile number"
-              error={errors.phone}
-            >
+            <Field id={`${uid}-phone`} label="Mobile number" error={errors.phone}>
               <input
                 id={`${uid}-phone`}
                 type="tel"
@@ -471,11 +482,7 @@ export default function CartPage() {
               />
             </Field>
 
-            <Field
-              id={`${uid}-address`}
-              label="Full address"
-              error={errors.address}
-            >
+            <Field id={`${uid}-address`} label="Full address" error={errors.address}>
               <textarea
                 id={`${uid}-address`}
                 rows={3}
@@ -492,9 +499,7 @@ export default function CartPage() {
             </Field>
 
             <div>
-              <span className="mb-1.5 block text-sm font-medium">
-                Delivery area
-              </span>
+              <span className="mb-1.5 block text-sm font-medium">Delivery area</span>
               <div
                 role="radiogroup"
                 aria-label="Delivery area"
@@ -535,6 +540,7 @@ export default function CartPage() {
         {/* RIGHT: summary */}
         <div className="space-y-4 self-start rounded-2xl border border-border/60 bg-card p-5 md:p-6 lg:col-span-2 lg:sticky lg:top-28">
           <h2 className="text-lg font-semibold">Order Summary</h2>
+
           {/* Each item with its own breakdown */}
           <ul className="space-y-3">
             {lines.map((l) => {
@@ -542,10 +548,7 @@ export default function CartPage() {
                 .filter(Boolean)
                 .join(" ");
               return (
-                <li
-                  key={l.key}
-                  className="rounded-xl bg-secondary/50 p-3 text-sm"
-                >
+                <li key={l.key} className="rounded-xl bg-secondary/50 p-3 text-sm">
                   <p className="font-semibold leading-snug">
                     {l.name}
                     {l.size && (
@@ -556,10 +559,7 @@ export default function CartPage() {
                     )}
                   </p>
                   <div className="mt-2 space-y-1">
-                    <Line
-                      label={`Jersey × ${l.quantity}`}
-                      value={l.basePrice * l.quantity}
-                    />
+                    <Line label={`Jersey × ${l.quantity}`} value={l.basePrice * l.quantity} />
                     {l.uclPatch && (
                       <Line
                         label={`UCL patch × ${l.quantity}`}
@@ -578,8 +578,11 @@ export default function CartPage() {
             })}
           </ul>
 
-          <div className="space-y-2">
-            <Line label={`Items (${totalQty})`} value={subtotal} />
+          <div className="space-y-2 border-t border-border/60 pt-4">
+            <Line
+              label={`Subtotal (${totalQty} ${totalQty === 1 ? "item" : "items"})`}
+              value={subtotal}
+            />
             <Line label="Delivery" value={deliveryCharge} />
           </div>
 
@@ -588,10 +591,7 @@ export default function CartPage() {
           </div>
 
           {submitError && (
-            <p
-              role="alert"
-              className="rounded-xl bg-red-500/10 p-3 text-sm text-red-600"
-            >
+            <p role="alert" className="rounded-xl bg-red-500/10 p-3 text-sm text-red-600">
               {submitError}
             </p>
           )}
@@ -606,7 +606,9 @@ export default function CartPage() {
                 <Loader2 className="h-5 w-5 animate-spin" /> Placing order…
               </>
             ) : (
-              <>Place Order · {money(total)}</>
+              <>
+                {isPreorder ? "Place Pre-order" : "Place Order"} · {money(total)}
+              </>
             )}
           </button>
 

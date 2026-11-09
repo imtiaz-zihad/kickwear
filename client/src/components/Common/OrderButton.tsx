@@ -5,6 +5,7 @@ import { useId, useRef, useState } from "react";
 import {
   CheckCircle2,
   Check,
+  Clock,
   Loader2,
   MapPin,
   Phone,
@@ -48,6 +49,8 @@ interface Props {
   sizes?: string[]; // empty → no size selection needed
   addOns?: ProductAddOns;
   outOfStock?: boolean;
+  preorder?: boolean; // not in stock yet, but can be ordered
+  preorderNote?: string; // "Delivery 20-25 Nov"
 }
 
 type Errors = {
@@ -181,6 +184,8 @@ export default function OrderButton({
   sizes = [],
   addOns,
   outOfStock = false,
+  preorder = false,
+  preorderNote = "",
 }: Props) {
   const uid = useId();
   const { addItem, count: cartCount } = useCart();
@@ -210,7 +215,7 @@ export default function OrderButton({
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [placed, setPlaced] = useState<Order | null>(null);
-  const [cartMsg, setCartMsg] = useState<"" | "added" | "full">("");
+  const [cartMsg, setCartMsg] = useState<"" | "added" | "full" | "mixed">("");
 
   const needsSize = sizes.length > 0;
   const uclAvailable = addOns?.uclPatch?.enabled === true;
@@ -244,7 +249,7 @@ export default function OrderButton({
     .filter(Boolean)
     .join(" ");
   const waMessage = [
-    `Hi! I want to order: ${productName}`,
+    `Hi! I want to ${preorder ? "pre-order" : "order"}: ${productName}`,
     size && `Size: ${size}`,
     `Quantity: ${quantity}`,
     uclActive && "UCL patch: Yes",
@@ -328,12 +333,14 @@ export default function OrderButton({
       basePrice,
       uclPrice,
       printPrice,
+      preorder,
+      preorderNote,
     });
 
     if (addedTimer.current) clearTimeout(addedTimer.current);
 
-    if (result === "full") {
-      setCartMsg("full");
+    if (result === "full" || result === "mixed") {
+      setCartMsg(result);
       return;
     }
 
@@ -414,14 +421,20 @@ export default function OrderButton({
           </div>
 
           <div>
-            <h2 className="text-xl font-bold">Order placed!</h2>
+            <h2 className="text-xl font-bold">
+              {preorder ? "Pre-order placed!" : "Order placed!"}
+            </h2>
             <p className="mt-1 text-sm text-muted-foreground">
               Order #{placed._id.slice(-6).toUpperCase()}
             </p>
           </div>
 
           <p className="text-sm text-muted-foreground">
-            Thank you! We will call you shortly to confirm your order.
+            {preorder
+              ? `Thank you! We will call you shortly to confirm your pre-order.${
+                  preorderNote ? ` Expected: ${preorderNote}.` : ""
+                }`
+              : "Thank you! We will call you shortly to confirm your order."}
           </p>
 
           <div className="space-y-1 rounded-xl bg-background/70 p-4 text-left text-sm">
@@ -451,6 +464,22 @@ export default function OrderButton({
       ) : (
         /* ── Order form ── */
         <form onSubmit={handleSubmit} noValidate className="space-y-5">
+          {/* Pre-order notice */}
+          {preorder && (
+            <div className="flex gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3.5">
+              <Clock className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+              <div className="text-sm">
+                <p className="font-semibold text-amber-700">
+                  Pre-order{preorderNote ? ` · ${preorderNote}` : ""}
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  This jersey is not in stock yet. Order now and we will call you to
+                  confirm. Delivery after it arrives. Cash on Delivery.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Size */}
           {needsSize && (
             <div id={`${uid}-size`} className="scroll-mt-24">
@@ -607,14 +636,13 @@ export default function OrderButton({
             </div>
           )}
 
-          {/* Contact + Quantity + Add to Cart (one row) */}
+          {/* Quantity + WhatsApp (wide) + Call + Add to Cart (right) */}
           <div>
             <span className="mb-2 block text-sm font-semibold">Quantity</span>
 
             <div className="flex flex-wrap items-center gap-2">
               <QuantitySelector quantity={quantity} setQuantity={setQuantity} />
 
-              {/* WhatsApp (wide) + Call */}
               <div className="flex min-w-0 flex-1 basis-24 items-center gap-2">
                 <a
                   href={whatsappHref}
@@ -640,7 +668,6 @@ export default function OrderButton({
                 </a>
               </div>
 
-              {/* Add to cart (right side) */}
               <button
                 type="button"
                 onClick={handleAddToCart}
@@ -660,6 +687,21 @@ export default function OrderButton({
                 <span className="flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4 shrink-0" />
                   Added to cart ({cartCount} {cartCount === 1 ? "item" : "items"})
+                </span>
+                <Link href="/cart" className="shrink-0 font-semibold underline">
+                  View cart
+                </Link>
+              </div>
+            )}
+
+            {cartMsg === "mixed" && (
+              <div
+                role="alert"
+                className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-amber-500/10 px-4 py-3 text-sm text-amber-700"
+              >
+                <span>
+                  Pre-order and in-stock jerseys must be ordered separately. Please
+                  check out your cart first.
                 </span>
                 <Link href="/cart" className="shrink-0 font-semibold underline">
                   View cart
@@ -813,7 +855,8 @@ export default function OrderButton({
                 </>
               ) : (
                 <>
-                  <ShoppingBag size={18} /> Place Order · {money(total)}
+                  <ShoppingBag size={18} />{" "}
+                  {preorder ? "Place Pre-order" : "Place Order"} · {money(total)}
                 </>
               )}
             </button>

@@ -3,6 +3,9 @@ export type Size = (typeof SIZES)[number];
 
 export type Sleeve = "half" | "full";
 
+// "preorder" = not in stock yet, but customers can order it
+export type Availability = "in-stock" | "preorder";
+
 export interface AddOnConfig {
   enabled?: boolean;
   price?: number; // per jersey, defaults to 200 if missing
@@ -29,6 +32,8 @@ export interface Product {
   stock?: number;
   description?: string;
   isFeatured?: boolean;
+  availability?: Availability;
+  preorderNote?: string; // "Delivery 20-25 Nov"
   createdAt?: string;
   updatedAt?: string;
 }

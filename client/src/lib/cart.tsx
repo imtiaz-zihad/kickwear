@@ -29,6 +29,8 @@ export type CartLine = {
   basePrice: number;
   uclPrice: number;
   printPrice: number;
+  preorder: boolean; // pre-order jerseys cannot be mixed with in-stock ones
+  preorderNote: string; // "Delivery 20-25 Nov"
 };
 
 export type NewCartLine = Omit<CartLine, "key">;
@@ -79,6 +81,8 @@ function read(): CartLine[] {
         basePrice: num(o.basePrice),
         uclPrice: num(o.uclPrice),
         printPrice: num(o.printPrice),
+        preorder: o.preorder === true,
+        preorderNote: str(o.preorderNote) ?? "",
       };
       out.push({ ...line, key: makeKey(line) });
     }
@@ -96,11 +100,13 @@ function write(lines: CartLine[]) {
   }
 }
 
+type AddResult = "ok" | "full" | "mixed";
+
 type CartContextValue = {
   lines: CartLine[];
   ready: boolean; // false until the saved cart has been read
   count: number; // total pieces (for the navbar badge)
-  addItem: (line: NewCartLine) => "ok" | "full";
+  addItem: (line: NewCartLine) => AddResult;
   updateQty: (key: string, quantity: number) => void;
   remove: (key: string) => void;
   clear: () => void;
@@ -139,9 +145,15 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const addItem = useCallback(
-    (line: NewCartLine): "ok" | "full" => {
+    (line: NewCartLine): AddResult => {
       const key = makeKey(line);
       const current = ref.current;
+
+      // pre-order and in-stock jerseys ship at different times: separate orders
+      if (current.length > 0 && current[0].preorder !== line.preorder) {
+        return "mixed";
+      }
+
       const existing = current.find((l) => l.key === key);
 
       if (existing) {
@@ -155,6 +167,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                   basePrice: line.basePrice,
                   uclPrice: line.uclPrice,
                   printPrice: line.printPrice,
+                  preorderNote: line.preorderNote,
                 }
               : l,
           ),

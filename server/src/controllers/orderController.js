@@ -51,6 +51,8 @@ exports.createOrder = async (req, res) => {
     // 2. Calculate each item using database prices
     const orderItems = [];
     let itemsTotal = 0;
+    let preorderCount = 0;
+    let preorderNote = "";
 
     for (const item of items) {
       const {
@@ -82,8 +84,15 @@ exports.createOrder = async (req, res) => {
         });
       }
 
-      // 3. Validate stock
-      if (quantity > product.stock) {
+      // 3. Validate stock (pre-order products can be ordered at any stock)
+      const isPreorder = product.availability === "preorder";
+
+      if (isPreorder) {
+        preorderCount += 1;
+        if (!preorderNote && product.preorderNote) {
+          preorderNote = product.preorderNote;
+        }
+      } else if (quantity > product.stock) {
         return res.status(400).json({
           message: `Insufficient stock for ${product.name}`,
         });
@@ -157,6 +166,14 @@ exports.createOrder = async (req, res) => {
       itemsTotal += finalUnitPrice * quantity;
     }
 
+    // Pre-order and in-stock jerseys ship at different times: keep them apart
+    if (preorderCount > 0 && preorderCount !== orderItems.length) {
+      return res.status(400).json({
+        message:
+          "Pre-order jerseys must be ordered separately from in-stock jerseys",
+      });
+    }
+
     // 7. Calculate delivery and final total on the server
     const deliveryCharge = deliveryArea === "dhaka" ? 70 : 130;
     const totalPrice = itemsTotal + deliveryCharge;
@@ -170,6 +187,8 @@ exports.createOrder = async (req, res) => {
       items: orderItems,
       deliveryCharge,
       totalPrice,
+      isPreorder: preorderCount > 0,
+      preorderNote: preorderCount > 0 ? preorderNote : "",
       // Only an admin can tag a channel; public orders are always "web"
       source:
         req.adminCreated && ADMIN_SOURCES.includes(req.body.source)
@@ -261,9 +280,10 @@ exports.trackOrder = async (req, res) => {
 };
 
 // ✅ Get all orders (admin)
+// Query: page, limit, status, preorder=true|false
 exports.getOrders = async (req, res) => {
   try {
-    const { page = 1, limit = 50, status } = req.query;
+    const { page = 1, limit = 50, status, preorder } = req.query;
     const noCache = req.query.noCache === "true";
 
     const cacheKey = `orders:${JSON.stringify(req.query)}`;
@@ -273,7 +293,11 @@ exports.getOrders = async (req, res) => {
       if (cached) return res.json(cached);
     }
 
-    const query = status ? { status } : {};
+    const query = {};
+    if (status) query.status = status;
+    if (preorder === "true") query.isPreorder = true;
+    else if (preorder === "false") query.isPreorder = { $ne: true };
+
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     const [data, total] = await Promise.all([

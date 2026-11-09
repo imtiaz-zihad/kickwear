@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, ShoppingBag, Sparkles } from "lucide-react";
+import { ArrowRight, Clock, ShoppingBag, Sparkles } from "lucide-react";
 import { Product, Sleeve } from "@/types/product";
 
 interface Props {
@@ -36,6 +36,8 @@ export default function JerseyCard({ product, priority = false }: Props) {
   const hoverImage = product.images?.[1]; // shown on hover (desktop)
   const sleeve = getSleeveLabel(product);
 
+  const isPreorder = product.availability === "preorder";
+
   const hasDiscount = product.originalPrice > product.discountedPrice;
   const discount =
     product.discountPercentage && product.discountPercentage > 0
@@ -48,7 +50,9 @@ export default function JerseyCard({ product, priority = false }: Props) {
           )
         : 0;
 
-  const soldOut = product.stock !== undefined && product.stock <= 0;
+  // pre-order products can be ordered even when stock is 0
+  const soldOut =
+    !isPreorder && product.stock !== undefined && product.stock <= 0;
   const customizable =
     product.addOns?.uclPatch?.enabled === true ||
     product.addOns?.customPrint?.enabled === true;
@@ -116,6 +120,14 @@ export default function JerseyCard({ product, priority = false }: Props) {
           )}
         </div>
 
+        {/* Pre-order badge (bottom-left of the image) */}
+        {isPreorder && (
+          <span className="absolute bottom-1.5 left-1.5 inline-flex items-center gap-1 rounded-full bg-amber-500 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white shadow-sm md:bottom-2 md:left-2 md:px-2.5 md:py-1 md:text-[11px]">
+            <Clock className="h-3 w-3" />
+            Pre-order
+          </span>
+        )}
+
         {/* Sold out overlay */}
         {soldOut && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/45">
@@ -155,6 +167,12 @@ export default function JerseyCard({ product, priority = false }: Props) {
           )}
         </div>
 
+        {isPreorder && product.preorderNote && (
+          <p className="mt-1 truncate text-[11px] font-medium text-amber-600 md:text-xs">
+            {product.preorderNote}
+          </p>
+        )}
+
         {/* CTA (whole card is the link) */}
         <span
           className={`mt-3 flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-sm font-semibold transition-all ${
@@ -167,7 +185,7 @@ export default function JerseyCard({ product, priority = false }: Props) {
             "View details"
           ) : (
             <>
-              Order Now
+              {isPreorder ? "Pre-order Now" : "Order Now"}
               <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-17" />
             </>
           )}
