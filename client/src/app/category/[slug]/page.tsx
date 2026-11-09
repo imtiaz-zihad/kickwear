@@ -32,6 +32,10 @@ const CATEGORY_INFO: Record<string, { title: string; description: string }> = {
     title: "Jackets",
     description: "Track tops, windbreakers and jackets",
   },
+    "kids-set": {
+    title: "Kids Sets",
+    description: "Jersey and shorts sets for kids",
+  },
 };
 
 // Fallback for slugs not in CATEGORY_INFO: "t-shirts" → "T Shirts"

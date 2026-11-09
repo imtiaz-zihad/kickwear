@@ -12,6 +12,7 @@ import {
   Shirt,
   ShieldCheck,
   ShoppingCart,
+  Baby,
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "../ui/button";
@@ -26,6 +27,7 @@ const NAV_CATEGORIES = [
   { name: "Country Jersey", slug: "country-jersey", icon: Globe },
   { name: "Retro", slug: "retro", icon: History },
   { name: "Jacket", slug: "jacket", icon: Shirt },
+  { name: "Kids Set", slug: "kids-set", icon: Baby },
 ];
 
 // WhatsApp Icon

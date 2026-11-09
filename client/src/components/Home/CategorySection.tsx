@@ -1,4 +1,4 @@
-import { ArrowUpRight, Globe, History, Shirt, ShieldCheck } from "lucide-react";
+import { ArrowUpRight, Globe, History, Shirt, ShieldCheck, Baby } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
 
@@ -28,6 +28,10 @@ const categories: Category[] = [
   },
   { id: "3", name: "Retro", slug: "retro", count: 10, icon: History },
   { id: "4", name: "Jacket", slug: "jacket", count: 3, icon: Shirt },
+  {
+    id: "5", name: "Kids Set", slug: "kids-set", icon: Baby,
+    count: 16
+  }
 ];
 
 export default function CategorySection() {
@@ -56,7 +60,7 @@ export default function CategorySection() {
       </div>
 
       {/* Cards */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
         {categories.map(({ id, name, slug, count, icon: Icon }) => (
           <Link
             key={id}

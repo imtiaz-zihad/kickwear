@@ -1,7 +1,5 @@
 import CategoryProducts from "./CategoryProducts";
 
-export default function CountryJersey() {
-  return (
-    <CategoryProducts slug="country-jersey" title="Country Jerseys" limit={5} />
-  );
+export default function Kidsset() {
+  return <CategoryProducts slug="kids-set" title="Kids Sets" limit={5} />;
 }

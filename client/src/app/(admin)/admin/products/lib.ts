@@ -56,6 +56,7 @@ export const CATEGORIES = [
   { slug: "country-jersey", label: "Country Jersey" },
   { slug: "retro", label: "Retro" },
   { slug: "jacket", label: "Jacket" },
+  { slug: "kids-set", label: "Kids Set" },
 ];
 export const SIZES = ["S", "M", "L", "XL", "2XL"];
 export const DEFAULT_ADDON_PRICE = 200;
