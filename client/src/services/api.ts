@@ -35,7 +35,12 @@ export type PaginatedProducts = {
   data: Product[];
 };
 
-export type OrderStatus = "Pending" | "Confirmed" | "Shipped" | "Delivered";
+export type OrderStatus =
+  | "Pending"
+  | "Confirmed"
+  | "Shipped"
+  | "Delivered"
+  | "Cancelled";
 
 export type DeliveryArea = "dhaka" | "outside";
 
@@ -74,6 +79,8 @@ export type Order = {
   totalPrice: number;
   deliveryCharge: number;
   status: OrderStatus;
+  isPreorder?: boolean; // true when the order contains pre-order jerseys
+  preorderNote?: string; // "Delivery 20-25 Nov"
   createdAt: string;
   updatedAt: string;
 };
@@ -129,6 +136,15 @@ export const getProductsByCategory = async (
   const data = await apiFetch<PaginatedProducts>(`/products?${params}`, {
     next: { revalidate: 120 },
   });
+  return data.data ?? [];
+};
+
+// Get pre-order products — cached 2 min (handy for a future "Pre-order" section)
+export const getPreorderProducts = async (limit = 20): Promise<Product[]> => {
+  const data = await apiFetch<PaginatedProducts>(
+    `/products?availability=preorder&limit=${limit}`,
+    { next: { revalidate: 120 } }
+  );
   return data.data ?? [];
 };
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Eye, Loader2, Plus, Search } from "lucide-react";
+import { Clock, Eye, Loader2, Plus, Search } from "lucide-react";
 import {
   SOURCE_LABEL,
   STATUSES,
@@ -22,6 +22,7 @@ export default function OrdersPage() {
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<OrderStatus | "All">("All");
+  const [preorderOnly, setPreorderOnly] = useState(false);
   const [selected, setSelected] = useState<Order | null>(null);
   const [newOpen, setNewOpen] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
@@ -105,16 +106,24 @@ export default function OrdersPage() {
     }
   };
 
+  // Status counts follow the Pre-order toggle, so the numbers always match the list
   const counts = useMemo(() => {
-    const c: Record<string, number> = { All: orders.length };
-    STATUSES.forEach((s) => (c[s] = orders.filter((o) => o.status === s).length));
+    const base = preorderOnly ? orders.filter((o) => o.isPreorder) : orders;
+    const c: Record<string, number> = { All: base.length };
+    STATUSES.forEach((s) => (c[s] = base.filter((o) => o.status === s).length));
     return c;
-  }, [orders]);
+  }, [orders, preorderOnly]);
+
+  const preorderCount = useMemo(
+    () => orders.filter((o) => o.isPreorder).length,
+    [orders],
+  );
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     return [...orders]
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .filter((o) => !preorderOnly || o.isPreorder)
       .filter((o) => filter === "All" || o.status === filter)
       .filter(
         (o) =>
@@ -123,14 +132,17 @@ export default function OrdersPage() {
           o.phone.includes(q) ||
           shortId(o).toLowerCase().includes(q),
       );
-  }, [orders, filter, query]);
+  }, [orders, filter, preorderOnly, query]);
 
   return (
     <div className="space-y-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold md:text-3xl">Orders</h1>
-          <p className="text-muted-foreground">{orders.length} total orders</p>
+          <p className="text-muted-foreground">
+            {orders.length} total orders
+            {preorderCount > 0 && ` · ${preorderCount} pre-order`}
+          </p>
         </div>
         <button
           type="button"
@@ -159,6 +171,21 @@ export default function OrdersPage() {
               {s} <span className="opacity-70">({counts[s] ?? 0})</span>
             </button>
           ))}
+
+          {/* Pre-order toggle (combines with the status filter) */}
+          <button
+            type="button"
+            aria-pressed={preorderOnly}
+            onClick={() => setPreorderOnly((v) => !v)}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors ${
+              preorderOnly
+                ? "border-amber-500 bg-amber-500 text-white"
+                : "border-amber-500/40 bg-amber-500/10 text-amber-700 hover:border-amber-500"
+            }`}
+          >
+            <Clock className="h-3.5 w-3.5" />
+            Pre-order <span className="opacity-80">({preorderCount})</span>
+          </button>
         </div>
 
         <div className="relative md:w-72">
@@ -193,7 +220,9 @@ export default function OrdersPage() {
             return (
               <div
                 key={order._id}
-                className="flex flex-col justify-between gap-4 rounded-2xl border border-border/60 bg-card p-4 md:p-5"
+                className={`flex flex-col justify-between gap-4 rounded-2xl border bg-card p-4 md:p-5 ${
+                  order.isPreorder ? "border-amber-500/50" : "border-border/60"
+                }`}
               >
                 <div className="min-w-0 space-y-1.5">
                   <div className="flex flex-wrap items-center gap-2">
@@ -206,11 +235,20 @@ export default function OrdersPage() {
                     >
                       {areaLabel(area)}
                     </span>
+                    {order.isPreorder && <Chip accent>Pre-order</Chip>}
                     {order.source && order.source !== "web" && (
                       <Chip accent>{SOURCE_LABEL[order.source]}</Chip>
                     )}
                     {order.edited && <Chip>Edited</Chip>}
                   </div>
+
+                  {order.isPreorder && (
+                    <p className="flex items-center gap-1.5 text-xs font-medium text-amber-700">
+                      <Clock className="h-3.5 w-3.5" />
+                      {order.preorderNote || "Pre-order"}
+                    </p>
+                  )}
+
                   <p className="text-sm text-muted-foreground">
                     {order.phone} · {order.address}
                   </p>
