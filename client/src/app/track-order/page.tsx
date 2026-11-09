@@ -15,6 +15,7 @@ import {
   Search,
   ShoppingBag,
   Truck,
+  XCircle,
 } from "lucide-react";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
@@ -22,21 +23,26 @@ const WHATSAPP_NUMBER = "8801894302115";
 const BD_PHONE_REGEX = /^01[3-9]\d{8}$/;
 
 const STATUS_STEPS = ["Pending", "Confirmed", "Shipped", "Delivered"] as const;
-type Status = (typeof STATUS_STEPS)[number];
+type Step = (typeof STATUS_STEPS)[number];
+type Status = Step | "Cancelled";
 
 const STATUS_INFO: Record<
   Status,
-  { icon: typeof Clock; badge: string; message: string }
+  { icon: typeof Clock; badge: string; message: string; preorderMessage?: string }
 > = {
   Pending: {
     icon: Clock,
     badge: "bg-yellow-100 text-yellow-700",
     message: "We received your order. We will call you shortly to confirm it.",
+    preorderMessage:
+      "We received your pre-order. We will call you shortly to confirm it.",
   },
   Confirmed: {
     icon: CheckCircle,
     badge: "bg-blue-100 text-blue-700",
     message: "Your order is confirmed and is being prepared.",
+    preorderMessage:
+      "Your pre-order is confirmed. We will ship it as soon as the jersey arrives.",
   },
   Shipped: {
     icon: Truck,
@@ -47,6 +53,11 @@ const STATUS_INFO: Record<
     icon: Package,
     badge: "bg-green-100 text-green-700",
     message: "Delivered. Thank you for shopping with us!",
+  },
+  Cancelled: {
+    icon: XCircle,
+    badge: "bg-red-100 text-red-700",
+    message: "This order was cancelled. Contact us if you need help.",
   },
 };
 
@@ -71,6 +82,8 @@ type Order = {
   totalPrice: number;
   deliveryCharge: number;
   status: Status;
+  isPreorder?: boolean;
+  preorderNote?: string;
   createdAt: string;
 };
 
@@ -97,7 +110,7 @@ function Chip({
   );
 }
 
-function Stepper({ status }: { status: Status }) {
+function Stepper({ status }: { status: Step }) {
   const current = Math.max(0, STATUS_STEPS.indexOf(status));
 
   return (
@@ -149,16 +162,28 @@ function Stepper({ status }: { status: Status }) {
 
 function OrderCard({ order }: { order: Order }) {
   const info = STATUS_INFO[order.status] ?? STATUS_INFO.Pending;
+  const cancelled = order.status === "Cancelled";
   const subtotal = order.totalPrice - order.deliveryCharge;
-  const helpMessage = `Hi! I need help with my order #${shortId(order)} (${order.customerName}).`;
+  const helpMessage = `Hi! I need help with my ${
+    order.isPreorder ? "pre-order" : "order"
+  } #${shortId(order)} (${order.customerName}).`;
+
+  const message =
+    order.isPreorder && info.preorderMessage ? info.preorderMessage : info.message;
 
   return (
     <article className="overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm">
       {/* Top */}
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border/60 p-5">
         <div>
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          <p className="flex flex-wrap items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
             Order #{shortId(order)}
+            {order.isPreorder && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-white">
+                <Clock className="h-3 w-3" />
+                Pre-order
+              </span>
+            )}
           </p>
           <h2 className="mt-0.5 text-lg font-semibold">{order.customerName}</h2>
           <p className="mt-1 flex items-start gap-1.5 text-sm text-muted-foreground">
@@ -182,9 +207,17 @@ function OrderCard({ order }: { order: Order }) {
 
       {/* Progress */}
       <div className="space-y-4 p-5">
-        <Stepper status={order.status} />
+        {!cancelled && <Stepper status={order.status as Step} />}
+
+        {order.isPreorder && order.preorderNote && !cancelled && (
+          <p className="flex items-center justify-center gap-1.5 rounded-xl bg-amber-500/10 px-4 py-2.5 text-center text-sm font-medium text-amber-700">
+            <Clock className="h-4 w-4 shrink-0" />
+            Expected: {order.preorderNote}
+          </p>
+        )}
+
         <p className="rounded-xl bg-secondary/60 px-4 py-3 text-center text-sm text-muted-foreground">
-          {info.message}
+          {message}
         </p>
       </div>
 
