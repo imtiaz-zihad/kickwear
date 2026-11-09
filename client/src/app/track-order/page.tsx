@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
-const WHATSAPP_NUMBER = "8801958403338";
+const WHATSAPP_NUMBER = "8801894302115";
 const BD_PHONE_REGEX = /^01[3-9]\d{8}$/;
 
 const STATUS_STEPS = ["Pending", "Confirmed", "Shipped", "Delivered"] as const;
