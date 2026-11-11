@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Clock, ShoppingBag, Sparkles } from "lucide-react";
 import { Product, Sleeve } from "@/types/product";
+import { productPath } from "@/lib/productUrl";
 
 interface Props {
   product: Product;
@@ -65,7 +66,7 @@ export default function JerseyCard({ product, priority = false }: Props) {
 
   return (
     <Link
-      href={`/product/${product._id}`}
+      href={productPath(product)}
       className="group flex h-full flex-col rounded-2xl border border-border/50 bg-card p-1.5 md:p-2.5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/30 hover:shadow-xl hover:shadow-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
     >
       {/* Image */}

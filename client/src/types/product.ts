@@ -32,6 +32,7 @@ export interface Product {
   stock?: number;
   description?: string;
   isFeatured?: boolean;
+  slug?: string; // clean URL: "real-madrid-26-27-home-full-sleeve"
   availability?: Availability;
   preorderNote?: string; // "Delivery 20-25 Nov"
   createdAt?: string;

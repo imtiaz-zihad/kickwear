@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { ShoppingBag } from "lucide-react";
 import { Product } from "@/types/product";
+import { productPath } from "@/lib/productUrl";
 
 interface Props {
   product: Product;
@@ -12,7 +13,7 @@ const ProductCard = ({ product, priority = false }: Props) => {
   const image = product.images?.[0];
 
   return (
-    <Link href={`/product/${product._id}`} className="group block">
+    <Link href={productPath(product)} className="group block">
       <div className="relative aspect-3/4 rounded-2xl overflow-hidden bg-secondary mb-3 shadow-soft group-hover:shadow-card-hover transition-all duration-500">
 
         {/* Discount Badge */}

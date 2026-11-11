@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { Banknote, ChevronRight, Clock, Truck } from "lucide-react";
 import { getSingleProduct } from "@/services/api";
 import { Product, Sleeve } from "@/types/product";
@@ -42,6 +42,7 @@ export async function generateMetadata({
 
   return {
     title: product.name,
+    alternates: { canonical: `/product/${product.slug ?? id}` },
     description: `${verb} ${product.name} for ৳${product.discountedPrice.toLocaleString()}. Cash on delivery all over Bangladesh.`,
     openGraph: {
       title: product.name,
@@ -58,6 +59,11 @@ export default async function ProductDetails({
   const { id } = await params;
   const product = await getProduct(id);
   if (!product) notFound();
+
+  // Old ID links → clean slug URL
+  if (/^[a-f0-9]{24}$/i.test(id) && product.slug) {
+    permanentRedirect(`/product/${product.slug}`);
+  }
 
   const hasDiscount = product.originalPrice > product.discountedPrice;
   const savings = product.originalPrice - product.discountedPrice;

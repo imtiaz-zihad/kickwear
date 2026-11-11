@@ -93,15 +93,27 @@ export default function PageViews() {
     load();
     const timer = setInterval(load, 30_000);
 
-    // product names for /product/<id> paths
-    fetch(`${API}/products?limit=200`)
+    // product names for /product/<slug or id> paths
+    fetch(`${API}/products?limit=100`)
       .then((r) => r.json())
       .then((json) => {
-        const list: { _id: string; name: string }[] = Array.isArray(json)
+        const list: { _id: string; name: string; slug?: string }[] = Array.isArray(json)
           ? json
           : (json.data ?? []);
         if (!stop) {
-          setNames(Object.fromEntries(list.map((p) => [p._id, p.name])));
+          // both the old ID path and the new slug path map to the product name
+          setNames(
+            Object.fromEntries(
+              list.flatMap((p) =>
+                p.slug
+                  ? [
+                      [p._id, p.name],
+                      [p.slug, p.name],
+                    ]
+                  : [[p._id, p.name]],
+              ),
+            ),
+          );
         }
       })
       .catch(() => {});
@@ -116,7 +128,9 @@ export default function PageViews() {
     if (path === "/") return "Home";
     if (path.startsWith("/product/")) {
       const id = path.replace("/product/", "");
-      return names[id] ?? `Product …${id.slice(-6)}`;
+      if (names[id]) return names[id];
+      // unknown old ID link, or a slug of a deleted product
+      return /^[a-f0-9]{24}$/i.test(id) ? `Product …${id.slice(-6)}` : id;
     }
     if (path.startsWith("/category"))
       return `Category ${path.replace("/category", "")}`.trim();

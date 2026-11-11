@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { productPath } from "@/lib/productUrl";
 import {
   ArrowLeft,
   Banknote,
@@ -568,7 +569,7 @@ export default function CheckoutPage() {
                 )}
               </div>
               <Link
-                href={`/product/${product._id}`}
+                href={productPath(product)}
                 className="mt-2 inline-block text-xs font-medium text-primary hover:underline"
               >
                 Change
