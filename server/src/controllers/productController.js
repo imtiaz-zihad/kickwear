@@ -1,6 +1,8 @@
 // src/controllers/productController.js
+const mongoose = require("mongoose");
 const Product = require("../models/Product");
 const { getCache, setCache, invalidateCache } = require("../utils/cache");
+const { baseSlug, uniqueSlug } = require("../utils/slug");
 
 // Cache TTL constants (in seconds)
 const CACHE_TTL = {
@@ -9,6 +11,7 @@ const CACHE_TTL = {
 };
 
 // ✅ Only these fields can be written from the request body
+// (slug is NOT here: it is created once and never edited from the admin)
 const ALLOWED_FIELDS = [
   "name",
   "category",
@@ -162,14 +165,18 @@ exports.getProducts = async (req, res) => {
   }
 };
 
-// ─── Get single product ─────────────────────────────────────────────────────
+// ─── Get single product (by ID or by slug) ──────────────────────────────────
 exports.getSingleProduct = async (req, res) => {
   try {
-    const cacheKey = `product:${req.params.id}`;
+    const { id } = req.params;
+
+    const cacheKey = `product:${id}`;
     const cached = getCache(cacheKey);
     if (cached) return res.json(cached);
 
-    const data = await Product.findById(req.params.id).lean();
+    const data = mongoose.isValidObjectId(id)
+      ? await Product.findById(id).lean()
+      : await Product.findOne({ slug: String(id).toLowerCase() }).lean();
     if (!data) return res.status(404).json({ message: "Product not found" });
 
     setCache(cacheKey, data, CACHE_TTL.SINGLE_PRODUCT);
@@ -191,8 +198,12 @@ exports.addProduct = async (req, res) => {
     const priceError = checkPrices(original, discounted);
     if (priceError) return res.status(400).json({ message: priceError });
 
+    // Clean URL: created once, never changes when the product is renamed
+    const slug = await uniqueSlug(Product, baseSlug(data));
+
     const product = await Product.create({
       ...data,
+      slug,
       originalPrice: original,
       discountedPrice: discounted,
       discountPercentage: calcDiscount(original, discounted),
@@ -210,13 +221,25 @@ exports.addProduct = async (req, res) => {
 exports.updateProduct = async (req, res) => {
   try {
     const existing = await Product.findById(req.params.id)
-      .select("originalPrice discountedPrice")
+      .select("originalPrice discountedPrice slug name sleeve")
       .lean();
     if (!existing) return res.status(404).json({ message: "Product not found" });
 
     const update = pickAllowed(req.body);
     flattenAddOns(update);
     normalizeAvailability(update);
+
+    // Product from before slugs existed: give it one now
+    if (!existing.slug) {
+      update.slug = await uniqueSlug(
+        Product,
+        baseSlug({
+          name: update.name ?? existing.name,
+          sleeve: update.sleeve ?? existing.sleeve,
+        }),
+        existing._id
+      );
+    }
 
     // Re-validate and recalculate discount if either price changes
     if (update.originalPrice !== undefined || update.discountedPrice !== undefined) {
@@ -238,7 +261,9 @@ exports.updateProduct = async (req, res) => {
       runValidators: true,
     }).lean();
 
+    // The product is cached under both its ID and its slug
     invalidateCache(`product:${req.params.id}`);
+    if (data?.slug) invalidateCache(`product:${data.slug}`);
     invalidateCache("products:");
 
     res.json(data);
@@ -254,6 +279,7 @@ exports.deleteProduct = async (req, res) => {
     if (!data) return res.status(404).json({ message: "Product not found" });
 
     invalidateCache(`product:${req.params.id}`);
+    if (data.slug) invalidateCache(`product:${data.slug}`);
     invalidateCache("products:");
 
     res.json({ message: "Product deleted successfully" });

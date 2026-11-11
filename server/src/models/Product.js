@@ -9,6 +9,9 @@ const productSchema = new mongoose.Schema(
     // "Barcelona Home 26/27"
     name: { type: String, required: true, trim: true },
 
+    // clean URL part: "barcelona-home-26-27-half-sleeve" (created once)
+    slug: { type: String, unique: true, sparse: true, lowercase: true, trim: true },
+
     // slug: "club-jersey" | "country-jersey" | "retro" | "jacket"
     category: { type: String, required: true, lowercase: true, trim: true },
 
