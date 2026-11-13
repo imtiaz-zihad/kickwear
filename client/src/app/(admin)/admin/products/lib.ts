@@ -58,7 +58,9 @@ export const CATEGORIES = [
   { slug: "jacket", label: "Jacket" },
   { slug: "kids-set", label: "Kids Set" },
 ];
-export const SIZES = ["S", "M", "L", "XL", "2XL"];
+export const SIZES = ["S", "M", "L", "XL", "2XL", "3XL", "4XL"];
+// a NEW product starts with these (3XL / 4XL are switched on per product)
+export const DEFAULT_SIZES = ["S", "M", "L", "XL", "2XL"];
 export const DEFAULT_ADDON_PRICE = 200;
 export const PAGE_SIZE = 100;
 
@@ -131,7 +133,7 @@ export const emptyForm = (): FormState => ({
   sleeve: "",
   originalPrice: "",
   discountedPrice: "",
-  sizes: [...SIZES],
+  sizes: [...DEFAULT_SIZES],
   images: [""],
   description: "",
   stock: "1",

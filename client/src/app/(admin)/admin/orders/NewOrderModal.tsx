@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Loader2, X } from "lucide-react";
+import { sizeExtra } from "@/lib/sizes";
 import { BASE_URL, api } from "./lib";
 import type { Order } from "./lib";
 
@@ -94,6 +95,7 @@ export default function NewOrderModal({
   const wantsPrint = !!printCfg?.enabled && (!!customName.trim() || !!customNumber.trim());
   const unit =
     (product?.discountedPrice ?? 0) +
+    sizeExtra(size) +
     (uclPatch && patchCfg?.enabled ? (patchCfg.price ?? 0) : 0) +
     (wantsPrint ? (printCfg?.price ?? 0) : 0);
   const total = unit * quantity + CHARGE[deliveryArea];
@@ -204,6 +206,7 @@ export default function NewOrderModal({
               {sizes.map((s) => (
                 <option key={s} value={s}>
                   {s}
+                  {sizeExtra(s) > 0 ? ` (+৳${sizeExtra(s)})` : ""}
                 </option>
               ))}
             </select>
@@ -230,7 +233,7 @@ export default function NewOrderModal({
                 type="checkbox"
                 checked={uclPatch}
                 onChange={(e) => setUclPatch(e.target.checked)}
-                className="h-4 w-4 accent-[var(--primary)]"
+                className="h-4 w-4 accent-(--primary)"
               />
               UCL patch <span className="text-primary">+{fmt(patchCfg.price ?? 0)}</span>
             </label>

@@ -19,6 +19,7 @@ import { createOrder, type DeliveryArea, type Order } from "@/services/api";
 import { track, getMetaIds } from "@/lib/fbpixel";
 import { useAbandonedCheckout } from "@/lib/useAbandonedCheckout";
 import { useCart } from "@/lib/cart";
+import { sizeExtra } from "@/lib/sizes";
 
 // Mirrors the backend default. The backend recalculates the real price.
 const DEFAULT_ADDON_PRICE = 200;
@@ -226,8 +227,12 @@ export default function OrderButton({
   const uclActive = uclAvailable && uclPatch;
   const printActive = printAvailable && printOn;
 
+  const sizeExtraPrice = sizeExtra(size);
   const unitPrice =
-    basePrice + (uclActive ? uclPrice : 0) + (printActive ? printPrice : 0);
+    basePrice +
+    sizeExtraPrice +
+    (uclActive ? uclPrice : 0) +
+    (printActive ? printPrice : 0);
   const subtotal = unitPrice * quantity;
   const deliveryCharge = DELIVERY[form.deliveryArea].charge;
   const total = subtotal + deliveryCharge;
@@ -512,6 +517,11 @@ export default function OrderButton({
                       }`}
                     >
                       {s}
+                      {sizeExtra(s) > 0 && (
+                        <span className="ml-1 text-[10px] font-medium opacity-80">
+                          +{money(sizeExtra(s))}
+                        </span>
+                      )}
                     </button>
                   );
                 })}
@@ -818,6 +828,12 @@ export default function OrderButton({
           {/* Price summary */}
           <div className="space-y-1.5 rounded-xl bg-secondary/60 p-4 text-sm">
             <Row label={`Jersey × ${quantity}`} value={basePrice * quantity} />
+            {sizeExtraPrice > 0 && (
+              <Row
+                label={`Size ${size} extra × ${quantity}`}
+                value={sizeExtraPrice * quantity}
+              />
+            )}
             {uclActive && (
               <Row label={`UCL patch × ${quantity}`} value={uclPrice * quantity} />
             )}

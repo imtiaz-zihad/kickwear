@@ -52,6 +52,7 @@ export type OrderItem = {
   size?: string | null;
   quantity: number;
   basePrice?: number; // jersey price per unit
+  sizeExtra?: number; // extra for 3XL / 4XL per unit
   uclPatch?: boolean;
   customName?: string | null;
   customNumber?: string | null;

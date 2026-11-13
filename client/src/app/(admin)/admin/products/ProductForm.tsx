@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Loader2, X } from "lucide-react";
+import { sizeExtra } from "@/lib/sizes";
 import {
   CATEGORIES,
   DEFAULT_ADDON_PRICE,
@@ -290,12 +291,18 @@ export default function ProductForm({
                     }`}
                   >
                     {s}
+                    {sizeExtra(s) > 0 && (
+                      <span className="ml-1 text-[10px] font-medium opacity-80">
+                        +৳{sizeExtra(s)}
+                      </span>
+                    )}
                   </button>
                 );
               })}
             </div>
             <p className="text-xs text-muted-foreground">
-              Customers can only pick the sizes selected here.
+              Customers can only pick the sizes selected here. 3XL and 4XL are added to
+              the price automatically.
             </p>
           </Section>
 

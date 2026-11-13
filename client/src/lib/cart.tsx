@@ -11,6 +11,9 @@ import {
   useRef,
   useState,
 } from "react";
+import { sizeExtra } from "./sizes";
+
+
 
 export const MAX_QTY = 10;
 export const MAX_LINES = 10;
@@ -39,7 +42,10 @@ export const hasPrint = (l: Pick<CartLine, "customName" | "customNumber">) =>
   Boolean(l.customName || l.customNumber);
 
 export const unitPrice = (l: CartLine) =>
-  l.basePrice + (l.uclPatch ? l.uclPrice : 0) + (hasPrint(l) ? l.printPrice : 0);
+  l.basePrice +
+  sizeExtra(l.size) +
+  (l.uclPatch ? l.uclPrice : 0) +
+  (hasPrint(l) ? l.printPrice : 0);
 
 export const lineTotal = (l: CartLine) => unitPrice(l) * l.quantity;
 

@@ -2,6 +2,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { useState } from "react";
+import { sizeExtra } from "@/lib/sizes";
 import {
   Copy,
   Loader2,
@@ -24,7 +25,7 @@ import {
 } from "./lib";
 import type { EditPayload, Order, OrderItem, OrderStatus } from "./lib";
 
-const SIZE_OPTIONS = ["S", "M", "L", "XL", "XXL", "3XL"];
+const SIZE_OPTIONS = ["S", "M", "L", "XL", "2XL", "3XL", "4XL"];
 
 export function Chip({
   children,
@@ -75,7 +76,8 @@ export function productionNote(order: Order): string {
     .join("\n");
 }
 
-type Draft = { size: string; quantity: string; price: string };
+// extra = the 3XL/4XL surcharge already inside `price`
+type Draft = { size: string; quantity: string; price: string; extra: number };
 
 const inputCls =
   "h-9 w-full rounded-lg border border-border bg-background px-2 text-sm outline-none focus:ring-2 focus:ring-primary";
@@ -109,6 +111,7 @@ export function OrderModal({
         size: itemSize(selected, it) ?? "",
         quantity: String(it.quantity),
         price: String(it.price),
+        extra: it.sizeExtra ?? 0,
       })),
     );
     setDelivery(String(selected.deliveryCharge));
@@ -119,6 +122,17 @@ export function OrderModal({
   const setField = (i: number, key: keyof Draft, value: string) =>
     setDraft((prev) =>
       prev.map((d, idx) => (idx === i ? { ...d, [key]: value } : d)),
+    );
+
+  // changing the size to / from 3XL or 4XL also moves the unit price
+  const changeSize = (i: number, size: string) =>
+    setDraft((prev) =>
+      prev.map((d, idx) => {
+        if (idx !== i) return d;
+        const extra = sizeExtra(size);
+        const price = Math.max(0, (Number(d.price) || 0) + extra - d.extra);
+        return { ...d, size, extra, price: String(price) };
+      }),
     );
 
   // live totals while editing
@@ -319,7 +333,7 @@ export function OrderModal({
                         Size
                         <select
                           value={draft[i].size}
-                          onChange={(e) => setField(i, "size", e.target.value)}
+                          onChange={(e) => changeSize(i, e.target.value)}
                           className={`${inputCls} mt-0.5`}
                         >
                           <option value="">–</option>
@@ -362,7 +376,7 @@ export function OrderModal({
                   ) : (
                     <p className="text-xs text-muted-foreground">
                       {item.basePrice !== undefined
-                        ? `${money(item.basePrice)}${addOns > 0 ? ` + ${money(addOns)} add-ons` : ""} each`
+                        ? `${money(item.basePrice)}${(item.sizeExtra ?? 0) > 0 ? ` + ${money(item.sizeExtra ?? 0)} size` : ""}${addOns > 0 ? ` + ${money(addOns)} add-ons` : ""} each`
                         : `${money(item.price)} each`}
                     </p>
                   )}

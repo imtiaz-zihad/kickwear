@@ -2,13 +2,16 @@
 
 import { Ruler, X } from "lucide-react";
 import { useRef } from "react";
+import { SIZE_SURCHARGE } from "@/lib/sizes";
 
 export const SIZE_CHART: { size: string; chest: number; length: number }[] = [
-  { size: "S", chest: 38, length: 27 },
-  { size: "M", chest: 40, length: 28 },
-  { size: "L", chest: 42, length: 29 },
-  { size: "XL", chest: 44, length: 30 },
-  { size: "2XL", chest: 46, length: 31 },
+  { size: "S", chest: 36, length: 27 },
+  { size: "M", chest: 38, length: 28 },
+  { size: "L", chest: 40, length: 29 },
+  { size: "XL", chest: 42, length: 30 },
+  { size: "2XL", chest: 44, length: 31 },
+  { size: "3XL", chest: 46, length: 32 },
+  { size: "4XL", chest: 48, length: 33 },
 ];
 
 export default function SizeChart({
@@ -60,6 +63,7 @@ export default function SizeChart({
                   <th className="px-4 py-2.5 font-semibold">Size</th>
                   <th className="px-4 py-2.5 font-semibold">Chest (inch)</th>
                   <th className="px-4 py-2.5 font-semibold">Length (inch)</th>
+                  <th className="px-4 py-2.5 text-right font-semibold">Extra</th>
                 </tr>
               </thead>
               <tbody>
@@ -75,6 +79,11 @@ export default function SizeChart({
                       <td className="px-4 py-2.5">{row.size}</td>
                       <td className="px-4 py-2.5">{row.chest}</td>
                       <td className="px-4 py-2.5">{row.length}</td>
+                      <td className="px-4 py-2.5 text-right">
+                        {SIZE_SURCHARGE[row.size]
+                          ? `+৳${SIZE_SURCHARGE[row.size]}`
+                          : "–"}
+                      </td>
                     </tr>
                   );
                 })}
@@ -83,7 +92,8 @@ export default function SizeChart({
           </div>
 
           <p className="mt-3 text-xs text-muted-foreground">
-            All measurements are in inches. Allow 1–2 inch variation.
+            All measurements are in inches. Allow 1–2 inch variation. 3XL and 4XL
+            cost a little extra (shown in the last column).
           </p>
         </div>
       </dialog>

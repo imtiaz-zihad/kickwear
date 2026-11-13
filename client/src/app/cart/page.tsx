@@ -17,6 +17,7 @@ import { createOrder, type DeliveryArea, type Order } from "@/services/api";
 import { track, getMetaIds } from "@/lib/fbpixel";
 import { useAbandonedCheckout } from "@/lib/useAbandonedCheckout";
 import { MAX_QTY, hasPrint, lineTotal, useCart } from "@/lib/cart";
+import { sizeExtra } from "@/lib/sizes";
 
 const BD_PHONE_REGEX = /^01[3-9]\d{8}$/;
 
@@ -560,6 +561,12 @@ export default function CartPage() {
                   </p>
                   <div className="mt-2 space-y-1">
                     <Line label={`Jersey × ${l.quantity}`} value={l.basePrice * l.quantity} />
+                    {sizeExtra(l.size) > 0 && (
+                      <Line
+                        label={`Size ${l.size} extra × ${l.quantity}`}
+                        value={sizeExtra(l.size) * l.quantity}
+                      />
+                    )}
                     {l.uclPatch && (
                       <Line
                         label={`UCL patch × ${l.quantity}`}
