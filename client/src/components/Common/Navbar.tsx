@@ -26,7 +26,7 @@ const NAV_CATEGORIES = [
   { name: "Club Jersey", slug: "club-jersey", icon: ShieldCheck },
   { name: "Country Jersey", slug: "country-jersey", icon: Globe },
   { name: "Retro", slug: "retro", icon: History },
-  { name: "Jacket", slug: "jacket", icon: Shirt },
+  // { name: "Jacket", slug: "jacket", icon: Shirt },
   { name: "Kids Set", slug: "kids-set", icon: Baby },
 ];
 

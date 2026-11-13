@@ -48,12 +48,12 @@ export default function Footer() {
             >
               Retro&apos;s Collection
             </Link>
-            <Link
+            {/* <Link
               href="/category/jacket"
               className="hover:text-primary transition-colors"
             >
               Jacket&apos;s Collection
-            </Link>
+            </Link> */}
             <Link
               href="/category/kids-set"
               className="hover:text-primary transition-colors"

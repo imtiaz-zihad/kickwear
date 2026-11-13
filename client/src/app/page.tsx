@@ -17,7 +17,7 @@ export default async function Home() {
       <CountryJersey/>
       <RetroJersey />
       <Kidsset />
-      <Jacket />
+      {/* <Jacket /> */}
     </div>
   );
 }
