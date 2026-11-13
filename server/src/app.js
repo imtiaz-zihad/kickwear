@@ -57,6 +57,7 @@ app.use("/api/admin", require("./routes/adminRoutes"));
 app.use("/api/products", require("./routes/productRoutes"));
 app.use("/api/orders", require("./routes/orderRoutes"));
 app.use("/api/abandoned", require("./routes/abandonedRoutes"));
+app.use("/api/push", require("./routes/pushRoutes")); 
 
 // ✅ 404 handler (always after all routes)
 app.use((req, res) => {
