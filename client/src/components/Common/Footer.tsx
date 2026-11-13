@@ -1,4 +1,4 @@
-import { MapPin, Phone, Truck } from "lucide-react";
+import { MapPin, Phone, Star, Truck } from "lucide-react";
 import Link from "next/link";
 
 const WHATSAPP_NUMBER = "88018940302115";
@@ -60,8 +60,6 @@ export default function Footer() {
             >
               Kids Set Collection
             </Link>
-
-
           </div>
         </div>
 
@@ -100,6 +98,14 @@ export default function Footer() {
             >
               <Phone className="h-3.5 w-3.5 text-primary" />
               Track Your Order
+            </Link>
+            {/* Reviews */}
+            <Link
+              href="/reviews"
+              className="hover:text-primary transition-colors flex items-center gap-2"
+            >
+              <Star className="h-3.5 w-3.5 text-primary" />
+              Customer Reviews
             </Link>
 
             {/* WhatsApp */}
@@ -155,7 +161,6 @@ export default function Footer() {
               </svg>
               Kickwear
             </a>
-
           </div>
         </div>
       </div>

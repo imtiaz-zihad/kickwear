@@ -9,10 +9,10 @@ import {
   MapPin,
   Globe,
   History,
-  Shirt,
   ShieldCheck,
   ShoppingCart,
   Baby,
+  Star,
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "../ui/button";
@@ -106,6 +106,19 @@ const Navbar = () => {
             <WhatsAppIcon className="h-5 w-5" />
             WhatsApp
           </a>
+
+          {/* REVIEWS - DESKTOP */}
+          <Link
+            href="/reviews"
+            className={`hidden items-center gap-1.5 rounded-full px-5 py-2.5 text-base font-medium transition-all duration-200 lg:flex ${
+              isActive("/reviews")
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+            }`}
+          >
+            <Star className="h-4 w-4" />
+            Reviews
+          </Link>
 
           {/* TRACK ORDER - DESKTOP */}
           <Link
@@ -214,6 +227,16 @@ const Navbar = () => {
             <WhatsAppIcon className="h-5 w-5" />
             WhatsApp
           </a>
+
+          {/* REVIEWS - MOBILE */}
+          <Link
+            href="/reviews"
+            onClick={() => setMobileOpen(false)}
+            className="flex items-center gap-2 rounded-xl px-4 py-3 text-base font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+          >
+            <Star className="h-5 w-5" />
+            Reviews
+          </Link>
 
           {/* TRACK ORDER - MOBILE */}
           <Link

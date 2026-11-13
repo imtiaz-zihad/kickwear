@@ -1,4 +1,4 @@
-import { ArrowUpRight, Globe, History, Shirt, ShieldCheck, Baby } from "lucide-react";
+import { ArrowUpRight, Globe, History,  ShieldCheck, Baby } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
 
@@ -51,7 +51,7 @@ export default function CategorySection() {
         </h2>
 
         <Link
-          href="/shop"
+          href="category/club-jersey"
           className="hidden items-center gap-1 text-sm font-semibold text-primary hover:underline sm:inline-flex"
         >
           View all
@@ -60,7 +60,7 @@ export default function CategorySection() {
       </div>
 
       {/* Cards */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {categories.map(({ id, name, slug, count, icon: Icon }) => (
           <Link
             key={id}
