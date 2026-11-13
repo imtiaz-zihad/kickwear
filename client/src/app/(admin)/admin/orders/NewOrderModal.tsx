@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, X } from "lucide-react";
+import { Check, Loader2, Search, X } from "lucide-react";
 import { sizeExtra } from "@/lib/sizes";
 import { BASE_URL, api } from "./lib";
 import type { Order } from "./lib";
@@ -14,6 +14,8 @@ type AddOn = { enabled?: boolean; price?: number };
 type AdminProduct = {
   _id: string;
   name: string;
+  category?: string;
+  subcategory?: string;
   discountedPrice: number;
   sizes?: string[];
   stock?: number;
@@ -26,6 +28,22 @@ const CHANNELS = [
   { value: "instagram", label: "Instagram" },
   { value: "phone", label: "Phone call" },
 ] as const;
+
+// The server returns at most 100 products per page: load every page
+async function fetchAllProducts(): Promise<AdminProduct[]> {
+  const all: AdminProduct[] = [];
+  let page = 1;
+  let totalPages = 1;
+  do {
+    const res = await fetch(`${BASE_URL}/products?limit=100&page=${page}`);
+    const json = await res.json();
+    if (Array.isArray(json)) return json;
+    all.push(...(json.data ?? []));
+    totalPages = json.totalPages ?? 1;
+    page += 1;
+  } while (page <= totalPages && page <= 20);
+  return all;
+}
 
 const fmt = (n: number) => `৳${n.toLocaleString()}`;
 
@@ -65,11 +83,7 @@ export default function NewOrderModal({
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch(`${BASE_URL}/products?limit=200`);
-        const json = await res.json();
-        const list: AdminProduct[] = Array.isArray(json) ? json : (json.data ?? []);
-        setProducts(list);
-        if (list[0]) setProductId(list[0]._id);
+        setProducts(await fetchAllProducts());
       } catch {
         setError("Could not load products");
       }
@@ -81,12 +95,23 @@ export default function NewOrderModal({
     [products, productId],
   );
 
-  // product list narrowed by the search box (the chosen product always stays in)
+  // every word typed must match the name, team or category ("barca home" finds "Barcelona Home …")
   const options = useMemo(() => {
-    const q = productQuery.trim().toLowerCase();
-    const list = q ? products.filter((p) => p.name.toLowerCase().includes(q)) : products;
-    return product && !list.some((p) => p._id === product._id) ? [product, ...list] : list;
-  }, [products, productQuery, product]);
+    const words = productQuery.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    if (words.length === 0) return products;
+    return products.filter((p) => {
+      const hay = `${p.name} ${p.subcategory ?? ""} ${p.category ?? ""}`.toLowerCase();
+      return words.every((w) => hay.includes(w));
+    });
+  }, [products, productQuery]);
+
+  const pickProduct = (id: string) => {
+    setProductId(id);
+    setSize("");
+    setUclPatch(false);
+    setCustomName("");
+    setCustomNumber("");
+  };
 
   const sizes = product?.sizes ?? [];
   const patchCfg = product?.addOns?.uclPatch;
@@ -168,35 +193,66 @@ export default function NewOrderModal({
             </select>
           </div>
 
-          <div>
-            <label className="mb-1.5 block text-sm font-medium">Find product</label>
-            <input
-              value={productQuery}
-              onChange={(e) => setProductQuery(e.target.value)}
-              placeholder="Type to search…"
-              className={field}
-            />
-          </div>
-
           <div className="sm:col-span-2">
-            <label className="mb-1.5 block text-sm font-medium">Product</label>
-            <select
-              value={productId}
-              onChange={(e) => {
-                setProductId(e.target.value);
-                setSize("");
-                setUclPatch(false);
-                setCustomName("");
-                setCustomNumber("");
-              }}
-              className={field}
+            <label className="mb-1.5 block text-sm font-medium">
+              Product{" "}
+              <span className="font-normal text-muted-foreground">
+                ({products.length} loaded)
+              </span>
+            </label>
+
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                value={productQuery}
+                onChange={(e) => setProductQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  // Enter picks the first match
+                  if (e.key === "Enter" && options[0]) {
+                    e.preventDefault();
+                    pickProduct(options[0]._id);
+                  }
+                }}
+                placeholder="Search: barca home, real madrid, kids…"
+                className={`${field} pl-9`}
+              />
+            </div>
+
+            <ul
+              role="listbox"
+              aria-label="Products"
+              className="mt-2 max-h-56 overflow-y-auto rounded-lg border border-border bg-background"
             >
-              {options.map((p) => (
-                <option key={p._id} value={p._id}>
-                  {p.name} ({fmt(p.discountedPrice)})
-                </option>
-              ))}
-            </select>
+              {options.length === 0 && (
+                <li className="px-3 py-4 text-center text-sm text-muted-foreground">
+                  {products.length === 0 ? "Loading products…" : "No product found"}
+                </li>
+              )}
+              {options.map((p) => {
+                const on = p._id === productId;
+                return (
+                  <li key={p._id} role="option" aria-selected={on}>
+                    <button
+                      type="button"
+                      onClick={() => pickProduct(p._id)}
+                      className={`flex w-full items-center justify-between gap-3 border-b border-border/50 px-3 py-2 text-left text-sm last:border-b-0 ${
+                        on ? "bg-primary/10 font-semibold" : "hover:bg-secondary"
+                      }`}
+                    >
+                      <span className="flex min-w-0 items-center gap-2">
+                        {on && <Check className="h-4 w-4 shrink-0 text-primary" />}
+                        <span className="truncate">{p.name}</span>
+                      </span>
+                      <span className="shrink-0 text-primary">{fmt(p.discountedPrice)}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              {product ? `Selected: ${product.name}` : "Select a product from the list"}
+            </p>
           </div>
 
           <div>

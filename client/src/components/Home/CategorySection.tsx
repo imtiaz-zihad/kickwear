@@ -27,7 +27,7 @@ const categories: Category[] = [
     icon: Globe,
   },
   { id: "3", name: "Retro", slug: "retro", count: 10, icon: History },
-  { id: "4", name: "Jacket", slug: "jacket", count: 3, icon: Shirt },
+  // { id: "4", name: "Jacket", slug: "jacket", count: 3, icon: Shirt },
   {
     id: "5", name: "Kids Set", slug: "kids-set", icon: Baby,
     count: 16

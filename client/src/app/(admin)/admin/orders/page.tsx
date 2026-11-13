@@ -48,6 +48,17 @@ export default function OrdersPage() {
     };
   }, []);
 
+    // the admin layout fires this when a new order arrives
+  useEffect(() => {
+    const reload = () => {
+      api<{ data?: Order[] } | Order[]>("/orders?limit=200&noCache=true")
+        .then((res) => setOrders(Array.isArray(res) ? res : (res.data ?? [])))
+        .catch(() => {});
+    };
+    window.addEventListener("kw:new-order", reload);
+    return () => window.removeEventListener("kw:new-order", reload);
+  }, []);
+
   // Esc closes the details modal
   useEffect(() => {
     if (!selected) return;
