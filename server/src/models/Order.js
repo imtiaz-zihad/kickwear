@@ -4,6 +4,7 @@ const mongoose = require("mongoose");
 const STATUSES = ["Pending", "Confirmed", "Shipped", "Delivered", "Cancelled"];
 const DELIVERY_AREAS = ["dhaka", "outside"];
 const SOURCES = ["web", "messenger", "whatsapp", "instagram", "phone"];
+const ADVANCE_METHODS = ["bkash", "nagad", "rocket", "bank", "cash"];
 
 const orderItemSchema = new mongoose.Schema(
   {
@@ -52,6 +53,11 @@ const orderSchema = new mongoose.Schema(
     // snapshot of the product's note at order time, e.g. "Delivery 20-25 Nov"
     preorderNote: { type: String, default: "" },
 
+    // advance payment taken before delivery (the rest is Cash on Delivery)
+    advancePaid: { type: Number, default: 0, min: 0 },
+    advanceMethod: { type: String, enum: [...ADVANCE_METHODS, ""], default: "" },
+    advanceTrxId: { type: String, trim: true, maxlength: 40, default: "" },
+
     size: { type: String, default: null }, // legacy (old orders)
 
     // set when an admin edits the order
@@ -71,3 +77,4 @@ module.exports = mongoose.model("Order", orderSchema);
 module.exports.STATUSES = STATUSES;
 module.exports.DELIVERY_AREAS = DELIVERY_AREAS;
 module.exports.SOURCES = SOURCES;
+module.exports.ADVANCE_METHODS = ADVANCE_METHODS;

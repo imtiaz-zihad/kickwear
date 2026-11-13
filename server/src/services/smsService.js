@@ -20,8 +20,10 @@ const sendSMS = async (phone, message) => {
 };
 
 const SMS_MESSAGES = {
-  Confirmed: (name, total, phone) =>
-    `প্রিয় ${name},\n\nআপনার ${total} টাকার অর্ডারটি নিশ্চিত হয়েছে। শীঘ্রই ডেলিভারি দেওয়া হবে।\n\nঅর্ডার ট্র্যাক করুন:\nhttps://www.kickwear.shop/track-order \n\nধন্যবাদ\nKickwear`,
+  Confirmed: (name, total, phone, advance = 0) =>
+    advance > 0
+      ? `প্রিয় ${name},\n\nআপনার ${total} টাকার অর্ডারটি নিশ্চিত হয়েছে। অগ্রিম ${advance} টাকা পেয়েছি, ডেলিভারির সময় ${total - advance} টাকা দিতে হবে।\n\nঅর্ডার ট্র্যাক করুন:\nhttps://www.kickwear.shop/track-order \n\nধন্যবাদ\nKickwear`
+      : `প্রিয় ${name},\n\nআপনার ${total} টাকার অর্ডারটি নিশ্চিত হয়েছে। শীঘ্রই ডেলিভারি দেওয়া হবে।\n\nঅর্ডার ট্র্যাক করুন:\nhttps://www.kickwear.shop/track-order \n\nধন্যবাদ\nKickwear`,
 };
 
 module.exports = { sendSMS, SMS_MESSAGES };

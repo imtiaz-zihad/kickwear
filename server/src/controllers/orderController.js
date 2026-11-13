@@ -252,6 +252,7 @@ exports.updateStatus = async (req, res) => {
         order.customerName,
         order.totalPrice,
         order.phone,
+        order.advancePaid || 0,
       );
       sendSMS(order.phone, message);
     }
@@ -415,6 +416,14 @@ exports.updateOrder = async (req, res) => {
 
     const itemsTotal = order.items.reduce((s, it) => s + it.price * it.quantity, 0);
     order.totalPrice = itemsTotal + order.deliveryCharge;
+
+    // the customer already paid part of it: the total cannot drop below that
+    if ((order.advancePaid || 0) > order.totalPrice) {
+      return res.status(409).json({
+        message: `Total cannot be lower than the advance already paid (৳${order.advancePaid}). Lower the advance first.`,
+      });
+    }
+
     order.edited = true;
 
     await order.save();
@@ -426,5 +435,48 @@ exports.updateOrder = async (req, res) => {
   } catch (err) {
     console.error("Update Order Error:", err);
     res.status(500).json({ message: "Failed to update order" });
+  }
+};
+
+// ✅ Admin: record / change the advance payment on an order
+// Body: { amount, method?, trxId? }   amount 0 clears it
+// Allowed in any status (an advance can arrive after the order is confirmed)
+exports.updateAdvance = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ message: "Invalid order id" });
+    }
+
+    const order = await Order.findById(id);
+    if (!order) return res.status(404).json({ message: "Order not found" });
+
+    const amount = Math.round(Number(req.body?.amount));
+    if (!Number.isFinite(amount) || amount < 0 || amount > order.totalPrice) {
+      return res.status(400).json({
+        message: `Advance must be between ৳0 and ৳${order.totalPrice}`,
+      });
+    }
+
+    const method = String(req.body?.method || "");
+    if (method && !Order.ADVANCE_METHODS.includes(method)) {
+      return res.status(400).json({ message: "Invalid payment method" });
+    }
+
+    order.advancePaid = amount;
+    // clearing the amount clears the details too
+    order.advanceMethod = amount > 0 ? method : "";
+    order.advanceTrxId =
+      amount > 0 ? String(req.body?.trxId || "").trim().slice(0, 40) : "";
+
+    await order.save();
+
+    invalidateCache("orders:");
+    invalidateCache(`track:${order.phone}`);
+
+    res.json(order);
+  } catch (err) {
+    console.error("Update Advance Error:", err);
+    res.status(500).json({ message: "Failed to update advance" });
   }
 };
