@@ -7,6 +7,7 @@ const images = [
   { src: "/banner4.png", alt: "Hero Banner 1" },
   { src: "/banner2.jpg", alt: "Hero Banner 2" },
   { src: "/banner3.jpg", alt: "Hero Banner 3" },
+  { src: "/banner7.jpg", alt: "Hero Banner 4" },
 ];
 
 export default function HeroImage() {
