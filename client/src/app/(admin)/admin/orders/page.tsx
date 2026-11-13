@@ -8,11 +8,12 @@ import {
   STATUS_BADGE,
   api,
   areaLabel,
+  dueAmount,
   getArea,
   money,
   shortId,
 } from "./lib";
-import type { EditPayload, Order, OrderStatus } from "./lib";
+import type { AdvancePayload, EditPayload, Order, OrderStatus } from "./lib";
 import { Chip, ItemLine, OrderModal, productionNote } from "./OrderParts";
 import NewOrderModal from "./NewOrderModal";
 
@@ -89,6 +90,20 @@ export default function OrdersPage() {
     setOrders((prev) => prev.map((o) => (o._id === updated._id ? updated : o)));
     setSelected((s) => (s && s._id === updated._id ? updated : s));
     flash(`Order #${shortId(updated)} updated`);
+  };
+
+  const saveAdvance = async (order: Order, payload: AdvancePayload) => {
+    const updated = await api<Order>(`/orders/${order._id}/advance`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+    setOrders((prev) => prev.map((o) => (o._id === updated._id ? updated : o)));
+    setSelected((s) => (s && s._id === updated._id ? updated : s));
+    flash(
+      payload.amount > 0
+        ? `Order #${shortId(updated)}: advance ${money(payload.amount)} saved`
+        : `Order #${shortId(updated)}: advance removed`,
+    );
   };
 
   const handleCreated = (order: Order) => {
@@ -265,9 +280,16 @@ export default function OrdersPage() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3 border-t border-border/60 pt-3">
-                  <p className="mr-auto text-lg font-semibold text-primary">
-                    {money(order.totalPrice)}
-                  </p>
+                  <div className="mr-auto">
+                    <p className="text-lg font-semibold text-primary">
+                      {money(order.totalPrice)}
+                    </p>
+                    {(order.advancePaid ?? 0) > 0 && (
+                      <p className="text-xs font-semibold text-amber-700">
+                        Advance {money(order.advancePaid ?? 0)} · Collect {money(dueAmount(order))}
+                      </p>
+                    )}
+                  </div>
 
                   <select
                     value={order.status}
@@ -307,6 +329,7 @@ export default function OrdersPage() {
           onChangeStatus={changeStatus}
           onCopyNote={copyNote}
           onSaveEdit={saveEdit}
+          onSaveAdvance={saveAdvance}
         />
       )}
 

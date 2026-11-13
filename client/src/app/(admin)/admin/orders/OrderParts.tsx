@@ -15,15 +15,17 @@ import {
 import {
   SOURCE_LABEL,
   STATUSES,
+  ADVANCE_METHODS,
   STATUS_BADGE,
   areaLabel,
+  dueAmount,
   getArea,
   itemSize,
   money,
   printText,
   shortId,
 } from "./lib";
-import type { EditPayload, Order, OrderItem, OrderStatus } from "./lib";
+import type { AdvancePayload, EditPayload, Order, OrderItem, OrderStatus } from "./lib";
 
 const SIZE_OPTIONS = ["S", "M", "L", "XL", "2XL", "3XL", "4XL"];
 
@@ -89,6 +91,7 @@ export function OrderModal({
   onChangeStatus,
   onCopyNote,
   onSaveEdit,
+  onSaveAdvance,
 }: {
   selected: Order;
   updatingId: string | null;
@@ -96,12 +99,39 @@ export function OrderModal({
   onChangeStatus: (order: Order, status: OrderStatus) => void;
   onCopyNote: (order: Order) => void;
   onSaveEdit: (order: Order, payload: EditPayload) => Promise<void>;
+  onSaveAdvance: (order: Order, payload: AdvancePayload) => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Draft[]>([]);
   const [delivery, setDelivery] = useState("");
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
+
+  // advance payment box
+  const [advAmount, setAdvAmount] = useState(String(selected.advancePaid ?? 0));
+  const [advMethod, setAdvMethod] = useState(selected.advanceMethod ?? "");
+  const [advTrx, setAdvTrx] = useState(selected.advanceTrxId ?? "");
+  const [advSaving, setAdvSaving] = useState(false);
+  const [advErr, setAdvErr] = useState("");
+
+  const advance = selected.advancePaid ?? 0;
+  const due = dueAmount(selected);
+
+  const saveAdvance = async () => {
+    setAdvErr("");
+    const amount = Math.round(Number(advAmount));
+    if (!Number.isFinite(amount) || amount < 0 || amount > selected.totalPrice) {
+      return setAdvErr(`Enter an amount from ৳0 to ${money(selected.totalPrice)}`);
+    }
+    setAdvSaving(true);
+    try {
+      await onSaveAdvance(selected, { amount, method: advMethod, trxId: advTrx.trim() });
+    } catch (e) {
+      setAdvErr(e instanceof Error ? e.message : "Could not save");
+    } finally {
+      setAdvSaving(false);
+    }
+  };
 
   const canEdit = ["Pending", "Confirmed"].includes(selected.status);
 
@@ -423,7 +453,88 @@ export function OrderModal({
               Original total: {money(selected.originalTotal)}
             </p>
           )}
+
+          {/* Advance paid / due on delivery */}
+          {!editing && advance > 0 && (
+            <>
+              <div className="flex justify-between text-green-700">
+                <span>
+                  Advance paid
+                  {selected.advanceMethod &&
+                    ` (${ADVANCE_METHODS.find((m) => m.value === selected.advanceMethod)?.label ?? selected.advanceMethod}${selected.advanceTrxId ? ` · ${selected.advanceTrxId}` : ""})`}
+                </span>
+                <span>− {money(advance)}</span>
+              </div>
+              <div className="flex justify-between rounded-lg bg-amber-500/10 px-3 py-2 text-base font-bold text-amber-700">
+                <span>Collect on delivery</span>
+                <span>{money(due)}</span>
+              </div>
+            </>
+          )}
         </div>
+
+        {/* Record advance payment */}
+        {!editing && (
+          <div className="mt-4 space-y-3 rounded-xl border border-border/60 bg-secondary/40 p-3">
+            <p className="text-sm font-semibold">Advance payment</p>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <label className="text-xs text-muted-foreground">
+                Amount ৳
+                <input
+                  type="number"
+                  min={0}
+                  max={selected.totalPrice}
+                  value={advAmount}
+                  onChange={(e) => setAdvAmount(e.target.value)}
+                  className={`${inputCls} mt-0.5`}
+                />
+              </label>
+              <label className="text-xs text-muted-foreground">
+                Method
+                <select
+                  value={advMethod}
+                  onChange={(e) => setAdvMethod(e.target.value)}
+                  className={`${inputCls} mt-0.5`}
+                >
+                  <option value="">–</option>
+                  {ADVANCE_METHODS.map((m) => (
+                    <option key={m.value} value={m.value}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="col-span-2 text-xs text-muted-foreground sm:col-span-1">
+                TrxID (optional)
+                <input
+                  value={advTrx}
+                  maxLength={40}
+                  onChange={(e) => setAdvTrx(e.target.value)}
+                  className={`${inputCls} mt-0.5`}
+                />
+              </label>
+            </div>
+            {advErr && (
+              <p role="alert" className="rounded-lg bg-red-500/10 p-2 text-xs text-red-600">
+                {advErr}
+              </p>
+            )}
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs text-muted-foreground">
+                Set 0 to remove the advance.
+              </p>
+              <button
+                type="button"
+                onClick={saveAdvance}
+                disabled={advSaving}
+                className="flex h-9 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
+              >
+                {advSaving && <Loader2 className="h-4 w-4 animate-spin" />}
+                Save advance
+              </button>
+            </div>
+          </div>
+        )}
 
         {editing && (
           <div className="mt-4 space-y-3">

@@ -82,6 +82,7 @@ export type Order = {
   status: OrderStatus;
   isPreorder?: boolean; // true when the order contains pre-order jerseys
   preorderNote?: string; // "Delivery 20-25 Nov"
+  advancePaid?: number; // paid in advance, the rest is Cash on Delivery
   createdAt: string;
   updatedAt: string;
 };

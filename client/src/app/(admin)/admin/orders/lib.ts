@@ -69,6 +69,9 @@ export type Order = {
   isPreorder?: boolean;
   preorderNote?: string;
   originalTotal?: number | null;
+  advancePaid?: number; // paid before delivery; the rest is Cash on Delivery
+  advanceMethod?: string;
+  advanceTrxId?: string;
   createdAt: string;
 };
 
@@ -77,6 +80,21 @@ export type EditPayload = {
   items?: { size?: string | null; quantity?: number; price?: number }[];
   deliveryCharge?: number;
 };
+
+// what the admin sends to record an advance payment
+export type AdvancePayload = { amount: number; method: string; trxId: string };
+
+export const ADVANCE_METHODS = [
+  { value: "bkash", label: "bKash" },
+  { value: "nagad", label: "Nagad" },
+  { value: "rocket", label: "Rocket" },
+  { value: "bank", label: "Bank" },
+  { value: "cash", label: "Cash" },
+];
+
+// amount the courier must collect on delivery
+export const dueAmount = (o: Order) =>
+  Math.max(0, o.totalPrice - (o.advancePaid ?? 0));
 
 export const money = (n: number) => `৳${(n ?? 0).toLocaleString()}`;
 export const shortId = (o: Order) => o._id.slice(-6).toUpperCase();

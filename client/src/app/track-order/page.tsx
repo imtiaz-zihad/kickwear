@@ -81,6 +81,7 @@ type Order = {
   items: OrderItem[];
   totalPrice: number;
   deliveryCharge: number;
+  advancePaid?: number;
   status: Status;
   isPreorder?: boolean;
   preorderNote?: string;
@@ -164,6 +165,7 @@ function OrderCard({ order }: { order: Order }) {
   const info = STATUS_INFO[order.status] ?? STATUS_INFO.Pending;
   const cancelled = order.status === "Cancelled";
   const subtotal = order.totalPrice - order.deliveryCharge;
+  const advance = order.advancePaid ?? 0;
   const helpMessage = `Hi! I need help with my ${
     order.isPreorder ? "pre-order" : "order"
   } #${shortId(order)} (${order.customerName}).`;
@@ -267,9 +269,21 @@ function OrderCard({ order }: { order: Order }) {
           <span>{money(order.deliveryCharge)}</span>
         </div>
         <div className="flex justify-between pt-1 text-base font-bold">
-          <span>Total · Cash on Delivery</span>
+          <span>{advance > 0 ? "Total" : "Total · Cash on Delivery"}</span>
           <span className="text-primary">{money(order.totalPrice)}</span>
         </div>
+        {advance > 0 && (
+          <>
+            <div className="flex justify-between text-green-700">
+              <span>Advance paid</span>
+              <span>− {money(advance)}</span>
+            </div>
+            <div className="flex justify-between text-base font-bold">
+              <span>To pay on delivery</span>
+              <span className="text-primary">{money(Math.max(0, order.totalPrice - advance))}</span>
+            </div>
+          </>
+        )}
 
         <a
           href={`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(helpMessage)}`}
