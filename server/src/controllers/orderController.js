@@ -5,6 +5,7 @@ const { getCache, setCache, invalidateCache } = require("../utils/cache");
 const { sendSMS, SMS_MESSAGES } = require("../services/smsService");
 const mongoose = require("mongoose");
 const { sendPurchase } = require("../services/metaCapi");
+const { sizeExtra: extraForSize } = require("../utils/sizes");
 
 const CACHE_TTL = {
   ORDER_LIST: 100,
@@ -146,8 +147,11 @@ exports.createOrder = async (req, res) => {
       const patchPrice = uclPatch ? patch.price : 0;
       const printingPrice = wantsPrinting ? printing.price : 0;
 
+      // 3XL / 4XL cost extra (set in utils/sizes.js)
+      const sizeExtra = extraForSize(size);
+
       const addOnsPrice = patchPrice + printingPrice;
-      const finalUnitPrice = basePrice + addOnsPrice;
+      const finalUnitPrice = basePrice + sizeExtra + addOnsPrice;
 
       orderItems.push({
         productId: product._id.toString(),
@@ -156,6 +160,7 @@ exports.createOrder = async (req, res) => {
         size: size || null,
         quantity,
         basePrice,
+        sizeExtra,
         uclPatch,
         customName: wantsPrinting ? customName.trim() : null,
         customNumber: wantsPrinting ? String(customNumber).trim() : null,
@@ -362,6 +367,17 @@ exports.updateOrder = async (req, res) => {
             }
           }
           item.size = size;
+
+          // moving to / from 3XL or 4XL changes the price (unless the admin
+          // sends an explicit price below)
+          const newExtra = extraForSize(size);
+          const oldExtra = item.sizeExtra || 0;
+          if (newExtra !== oldExtra) {
+            item.sizeExtra = newExtra;
+            if (patch.price === undefined) {
+              item.price = Math.max(0, item.price + newExtra - oldExtra);
+            }
+          }
         }
 
         if (patch.quantity !== undefined) {
@@ -378,7 +394,10 @@ exports.updateOrder = async (req, res) => {
             return res.status(400).json({ message: "Invalid price" });
           }
           item.price = p;
-          item.basePrice = Math.max(0, p - (item.addOnsPrice || 0));
+          item.basePrice = Math.max(
+            0,
+            p - (item.addOnsPrice || 0) - (item.sizeExtra || 0),
+          );
         }
       }
     }

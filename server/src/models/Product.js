@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-const SIZES = ["S", "M", "L", "XL", "2XL"];
+const { SIZES, DEFAULT_SIZES } = require("../utils/sizes");
 const SLEEVES = ["half", "full"];
 const AVAILABILITY = ["in-stock", "preorder"];
 
@@ -24,8 +24,8 @@ const productSchema = new mongoose.Schema(
     // "26/27"
     season: { type: String, trim: true },
 
-    // available sizes for this product
-    sizes: { type: [{ type: String, enum: SIZES }], default: SIZES },
+    // sizes this product is sold in (3XL / 4XL cost extra, see utils/sizes.js)
+    sizes: { type: [{ type: String, enum: SIZES }], default: DEFAULT_SIZES },
 
     // optional paid extras (price is per jersey)
     addOns: {

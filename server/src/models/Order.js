@@ -14,11 +14,12 @@ const orderItemSchema = new mongoose.Schema(
     quantity: { type: Number, required: true, min: 1 },
 
     basePrice: { type: Number, required: true, min: 0 }, // product price per unit
+    sizeExtra: { type: Number, default: 0, min: 0 }, // extra for 3XL / 4XL per unit
     uclPatch: { type: Boolean, default: false },
     customName: { type: String, default: null },
     customNumber: { type: String, default: null },
     addOnsPrice: { type: Number, default: 0, min: 0 }, // add-ons per unit
-    price: { type: Number, required: true, min: 0 }, // final price per unit
+    price: { type: Number, required: true, min: 0 }, // final price per unit (base + size extra + add-ons)
   },
   { _id: false },
 );
