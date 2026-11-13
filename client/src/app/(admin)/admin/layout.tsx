@@ -25,7 +25,8 @@ const MENU = [
   { name: "Live", path: "/admin/live", icon: Activity },
 ];
 
-const SEEN_KEY = "kw_orders_seen_at"; // time of the newest order the admin has seen
+const SEEN_KEY = "kw_orders_seen_at"; // newest order the admin has seen (badge)
+const ALERTED_KEY = "kw_orders_alerted_at"; // newest order we already beeped for
 const POLL_MS = 30_000;
 
 // short beep (browsers may block it until the page has been clicked once)
@@ -33,8 +34,7 @@ function beep() {
   try {
     const Ctx =
       window.AudioContext ||
-      (window as unknown as { webkitAudioContext?: typeof AudioContext })
-        .webkitAudioContext;
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!Ctx) return;
     const ctx = new Ctx();
     const osc = ctx.createOscillator();
@@ -52,11 +52,7 @@ function beep() {
   }
 }
 
-export default function AdminLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const path = usePathname();
   const router = useRouter();
   const [authorized, setAuthorized] = useState(false);
@@ -64,7 +60,6 @@ export default function AdminLayout({
   // new-order alert
   const [newCount, setNewCount] = useState(0);
   const [toast, setToast] = useState<{ text: string } | null>(null);
-  const prevCount = useRef(0);
   const pathRef = useRef(path);
   const baseTitle = useRef("");
 
@@ -89,10 +84,10 @@ export default function AdminLayout({
       const res = await api<{ data?: Order[] }>("/orders?limit=1&noCache=true");
       const at = res.data?.[0]?.createdAt ?? new Date().toISOString();
       localStorage.setItem(SEEN_KEY, at);
+      localStorage.setItem(ALERTED_KEY, at);
     } catch {
       /* try again on the next poll */
     }
-    prevCount.current = 0;
     setNewCount(0);
   }, []);
 
@@ -115,13 +110,20 @@ export default function AdminLayout({
         );
         if (stop) return;
         const n = res.total ?? 0;
+        const o = res.data?.[0]; // newest unseen order
 
-        if (n > prevCount.current) {
-          const o = res.data?.[0];
+        // Alert only for an order we have not alerted for yet. This is stored
+        // (not kept in memory) so a page reload never repeats the beep.
+        let alerted: string | null = null;
+        try {
+          alerted = localStorage.getItem(ALERTED_KEY);
+        } catch {}
+        if (o && (!alerted || new Date(o.createdAt) > new Date(alerted))) {
+          try {
+            localStorage.setItem(ALERTED_KEY, o.createdAt);
+          } catch {}
           setToast({
-            text: o
-              ? `New order: ${o.customerName} · ৳${o.totalPrice.toLocaleString()}${n > 1 ? ` (+${n - 1} more)` : ""}`
-              : `${n} new orders`,
+            text: `New order: ${o.customerName} · ৳${o.totalPrice.toLocaleString()}${n > 1 ? ` (+${n - 1} more)` : ""}`,
           });
           beep();
           window.dispatchEvent(new Event("kw:new-order")); // Orders page reloads itself
@@ -130,8 +132,7 @@ export default function AdminLayout({
         if (pathRef.current.startsWith("/admin/orders")) {
           await markSeen(); // already looking at the orders
         } else {
-          prevCount.current = n;
-          setNewCount(n);
+          setNewCount(n); // badge stays until the Orders page is opened
         }
       } catch {
         /* offline or logged out: ignore */
@@ -159,8 +160,7 @@ export default function AdminLayout({
   // browser tab title: "(2) New order"
   useEffect(() => {
     if (!baseTitle.current) baseTitle.current = document.title;
-    document.title =
-      newCount > 0 ? `(${newCount}) New order!` : baseTitle.current;
+    document.title = newCount > 0 ? `(${newCount}) New order!` : baseTitle.current;
   }, [newCount]);
 
   // the toast hides itself
@@ -187,9 +187,7 @@ export default function AdminLayout({
           <div className="mb-3 flex items-center justify-between md:mb-9 md:block md:pl-1">
             <div>
               <span className="font-display text-lg font-bold">Kick </span>
-              <span className="font-display text-lg font-bold text-primary">
-                Wear
-              </span>
+              <span className="font-display text-lg font-bold text-primary">Wear</span>
               <div className="mt-1.5 hidden h-0.5 w-8 rounded bg-linear-to-r from-primary to-transparent md:block" />
             </div>
 

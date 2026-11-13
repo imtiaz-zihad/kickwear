@@ -18,7 +18,7 @@ self.addEventListener("push", (event) => {
       icon: "/logo.png",
       badge: "/logo.png",
       tag: data.tag || "kw-order",
-      renotify: true,
+      renotify: false,
       vibrate: [200, 100, 200],
       data: { url: data.url || "/admin/orders" },
     }),

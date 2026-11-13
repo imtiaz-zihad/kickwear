@@ -73,9 +73,10 @@ function orderPayload(order) {
 // Never throws and is never awaited by the order flow
 function notifyNewOrder(order) {
   try {
-    sendToAll(orderPayload(order)).catch((err) =>
-      console.error("Notify failed:", err.message),
-    );
+    const payload = orderPayload(order);
+    sendToAll(payload)
+      .then((n) => console.log(`Push ${payload.tag}: sent to ${n} device(s)`))
+      .catch((err) => console.error("Notify failed:", err.message));
   } catch (err) {
     console.error("Notify skipped:", err.message);
   }
