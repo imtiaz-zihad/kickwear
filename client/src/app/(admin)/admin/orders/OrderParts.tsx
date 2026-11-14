@@ -133,7 +133,7 @@ export function OrderModal({
     }
   };
 
-  const canEdit = ["Pending", "Confirmed"].includes(selected.status);
+  const canEdit = ["Pending", "Confirmed", "Collecting"].includes(selected.status);
 
   const startEdit = () => {
     setDraft(

@@ -1,7 +1,7 @@
 // src/models/Order.js
 const mongoose = require("mongoose");
 
-const STATUSES = ["Pending", "Confirmed", "Shipped", "Delivered", "Cancelled"];
+const STATUSES = ["Pending", "Confirmed","Collecting", "Shipped", "Delivered", "Cancelled"];
 const DELIVERY_AREAS = ["dhaka", "outside"];
 const SOURCES = ["web", "messenger", "whatsapp", "instagram", "phone"];
 const ADVANCE_METHODS = ["bkash", "nagad", "rocket", "bank", "cash"];
@@ -55,7 +55,11 @@ const orderSchema = new mongoose.Schema(
 
     // advance payment taken before delivery (the rest is Cash on Delivery)
     advancePaid: { type: Number, default: 0, min: 0 },
-    advanceMethod: { type: String, enum: [...ADVANCE_METHODS, ""], default: "" },
+    advanceMethod: {
+      type: String,
+      enum: [...ADVANCE_METHODS, ""],
+      default: "",
+    },
     advanceTrxId: { type: String, trim: true, maxlength: 40, default: "" },
 
     size: { type: String, default: null }, // legacy (old orders)

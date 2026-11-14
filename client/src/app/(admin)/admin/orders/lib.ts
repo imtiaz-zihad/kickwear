@@ -3,6 +3,7 @@ export const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 export type OrderStatus =
   | "Pending"
   | "Confirmed"
+  | "Collecting"
   | "Shipped"
   | "Delivered"
   | "Cancelled";
@@ -10,6 +11,7 @@ export type OrderStatus =
 export const STATUSES: OrderStatus[] = [
   "Pending",
   "Confirmed",
+  "Collecting",
   "Shipped",
   "Delivered",
   "Cancelled",
@@ -18,6 +20,7 @@ export const STATUSES: OrderStatus[] = [
 export const STATUS_BADGE: Record<string, string> = {
   Pending: "bg-yellow-100 text-yellow-700",
   Confirmed: "bg-green-100 text-green-700",
+  Collecting: "bg-violet-100 text-violet-700",
   Shipped: "bg-orange-100 text-orange-700",
   Delivered: "bg-blue-100 text-blue-700",
   Cancelled: "bg-red-100 text-red-700",

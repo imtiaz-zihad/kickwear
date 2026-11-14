@@ -22,7 +22,16 @@ const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const WHATSAPP_NUMBER = "8801894302115";
 const BD_PHONE_REGEX = /^01[3-9]\d{8}$/;
 
-const STATUS_STEPS = ["Pending", "Confirmed", "Shipped", "Delivered"] as const;
+const STATUS_STEPS = [
+  "Pending",
+  "Confirmed",
+  "Collecting",
+  "Shipped",
+  "Delivered",
+] as const;
+
+// Customers see "Preparing" (admin calls this step "Collecting")
+const STEP_LABEL: Partial<Record<string, string>> = { Collecting: "Preparing" };
 type Step = (typeof STATUS_STEPS)[number];
 type Status = Step | "Cancelled";
 
@@ -43,6 +52,13 @@ const STATUS_INFO: Record<
     message: "Your order is confirmed and is being prepared.",
     preorderMessage:
       "Your pre-order is confirmed. We will ship it as soon as the jersey arrives.",
+  },
+  Collecting: {
+    icon: ShoppingBag,
+    badge: "bg-violet-100 text-violet-700",
+    message: "We are getting your jersey ready. It will be shipped soon.",
+    preorderMessage:
+      "We are arranging your pre-ordered jersey. We will ship it as soon as it is ready.",
   },
   Shipped: {
     icon: Truck,
@@ -152,7 +168,7 @@ function Stepper({ status }: { status: Step }) {
                 reached ? "font-semibold text-foreground" : "text-muted-foreground"
               }`}
             >
-              {step}
+              {STEP_LABEL[step] ?? step}
             </span>
           </li>
         );
@@ -203,7 +219,7 @@ function OrderCard({ order }: { order: Order }) {
         </div>
 
         <span className={`rounded-full px-3 py-1 text-xs font-semibold ${info.badge}`}>
-          {order.status}
+          {STEP_LABEL[order.status] ?? order.status}
         </span>
       </div>
 

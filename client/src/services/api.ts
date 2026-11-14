@@ -6,7 +6,7 @@ const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!;
 
 async function apiFetch<T>(
   path: string,
-  options: RequestInit & { next?: { revalidate?: number } } = {}
+  options: RequestInit & { next?: { revalidate?: number } } = {},
 ): Promise<T> {
   const url = `${BASE_URL}${path}`;
 
@@ -38,6 +38,7 @@ export type PaginatedProducts = {
 export type OrderStatus =
   | "Pending"
   | "Confirmed"
+  | "Collecting"
   | "Shipped"
   | "Delivered"
   | "Cancelled";
@@ -107,11 +108,11 @@ export type GetOrdersResult = {
 // Get all products (paginated) — cached 2 min
 export const getProducts = async (
   page = 1,
-  limit = 100
+  limit = 100,
 ): Promise<PaginatedProducts> => {
   const data = await apiFetch<PaginatedProducts>(
     `/products?page=${page}&limit=${limit}`,
-    { next: { revalidate: 120 } }
+    { next: { revalidate: 120 } },
   );
   return data;
 };
@@ -120,7 +121,7 @@ export const getProducts = async (
 export const getFeaturedProducts = async (limit = 10): Promise<Product[]> => {
   const data = await apiFetch<PaginatedProducts>(
     `/products?featured=true&limit=${limit}`,
-    { next: { revalidate: 300 } }
+    { next: { revalidate: 300 } },
   );
   return data.data ?? [];
 };
@@ -129,7 +130,7 @@ export const getFeaturedProducts = async (limit = 10): Promise<Product[]> => {
 export const getProductsByCategory = async (
   category: string,
   subcategory?: string,
-  limit?: number // e.g. 5 for homepage sections; omit to get all
+  limit?: number, // e.g. 5 for homepage sections; omit to get all
 ): Promise<Product[]> => {
   const params = new URLSearchParams({ category });
   if (subcategory) params.set("subcategory", subcategory);
@@ -145,7 +146,7 @@ export const getProductsByCategory = async (
 export const getPreorderProducts = async (limit = 20): Promise<Product[]> => {
   const data = await apiFetch<PaginatedProducts>(
     `/products?availability=preorder&limit=${limit}`,
-    { next: { revalidate: 120 } }
+    { next: { revalidate: 120 } },
   );
   return data.data ?? [];
 };
@@ -153,7 +154,7 @@ export const getPreorderProducts = async (limit = 20): Promise<Product[]> => {
 // Search products — no cache (user input driven)
 export const searchProducts = async (
   query: string,
-  page = 1
+  page = 1,
 ): Promise<PaginatedProducts> => {
   const params = new URLSearchParams({ search: query, page: String(page) });
   return apiFetch<PaginatedProducts>(`/products?${params}`, {
@@ -181,7 +182,7 @@ export const addProduct = async (payload: NewProduct): Promise<Product> => {
 // Update product — no cache (mutation)
 export const updateProduct = async (
   id: string,
-  payload: Partial<Product>
+  payload: Partial<Product>,
 ): Promise<Product> => {
   return apiFetch<Product>(`/products/${id}`, {
     method: "PATCH",
@@ -192,7 +193,9 @@ export const updateProduct = async (
 };
 
 // Delete product — no cache (mutation)
-export const deleteProduct = async (id: string): Promise<{ message: string }> => {
+export const deleteProduct = async (
+  id: string,
+): Promise<{ message: string }> => {
   return apiFetch<{ message: string }>(`/products/${id}`, {
     method: "DELETE",
     cache: "no-store",
@@ -203,7 +206,7 @@ export const deleteProduct = async (id: string): Promise<{ message: string }> =>
 
 // Create order — no cache (mutation)
 export const createOrder = async (
-  order: CreateOrderPayload
+  order: CreateOrderPayload,
 ): Promise<Order> => {
   return apiFetch<Order>("/orders", {
     method: "POST",
@@ -217,7 +220,7 @@ export const createOrder = async (
 export const getOrders = async (
   page = 1,
   limit = 50,
-  status?: OrderStatus
+  status?: OrderStatus,
 ): Promise<GetOrdersResult> => {
   const params = new URLSearchParams({
     page: String(page),
@@ -233,7 +236,7 @@ export const getOrders = async (
 // Update order status — no cache (mutation)
 export const updateOrderStatus = async (
   orderId: string,
-  status: OrderStatus
+  status: OrderStatus,
 ): Promise<Order> => {
   return apiFetch<Order>(`/orders/${orderId}/status`, {
     method: "PATCH",

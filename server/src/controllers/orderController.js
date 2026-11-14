@@ -335,7 +335,7 @@ exports.updateOrder = async (req, res) => {
     const order = await Order.findById(id);
     if (!order) return res.status(404).json({ message: "Order not found" });
 
-    if (!["Pending", "Confirmed"].includes(order.status)) {
+    if (!["Pending", "Confirmed", "Collecting"].includes(order.status)) {
       return res
         .status(409)
         .json({ message: `A ${order.status} order cannot be edited` });
@@ -345,7 +345,9 @@ exports.updateOrder = async (req, res) => {
 
     if (items !== undefined) {
       if (!Array.isArray(items) || items.length !== order.items.length) {
-        return res.status(400).json({ message: "Items do not match this order" });
+        return res
+          .status(400)
+          .json({ message: "Items do not match this order" });
       }
 
       for (let i = 0; i < items.length; i++) {
@@ -359,7 +361,9 @@ exports.updateOrder = async (req, res) => {
               : null;
           if (size) {
             const product = mongoose.isValidObjectId(item.productId)
-              ? await Product.findById(item.productId).select("sizes name").lean()
+              ? await Product.findById(item.productId)
+                  .select("sizes name")
+                  .lean()
               : null;
             if (product?.sizes?.length && !product.sizes.includes(size)) {
               return res.status(400).json({
@@ -414,7 +418,10 @@ exports.updateOrder = async (req, res) => {
     // remember the original total once, for discount tracking
     if (order.originalTotal == null) order.originalTotal = order.totalPrice;
 
-    const itemsTotal = order.items.reduce((s, it) => s + it.price * it.quantity, 0);
+    const itemsTotal = order.items.reduce(
+      (s, it) => s + it.price * it.quantity,
+      0,
+    );
     order.totalPrice = itemsTotal + order.deliveryCharge;
 
     // the customer already paid part of it: the total cannot drop below that
@@ -467,7 +474,11 @@ exports.updateAdvance = async (req, res) => {
     // clearing the amount clears the details too
     order.advanceMethod = amount > 0 ? method : "";
     order.advanceTrxId =
-      amount > 0 ? String(req.body?.trxId || "").trim().slice(0, 40) : "";
+      amount > 0
+        ? String(req.body?.trxId || "")
+            .trim()
+            .slice(0, 40)
+        : "";
 
     await order.save();
 
