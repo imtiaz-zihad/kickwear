@@ -1,7 +1,14 @@
 // src/models/Order.js
 const mongoose = require("mongoose");
 
-const STATUSES = ["Pending", "Confirmed","Collecting", "Shipped", "Delivered", "Cancelled"];
+const STATUSES = [
+  "Pending",
+  "Confirmed",
+  "Collecting", // buying / collecting the jersey from the supplier
+  "Shipped",
+  "Delivered",
+  "Cancelled",
+];
 const DELIVERY_AREAS = ["dhaka", "outside"];
 const SOURCES = ["web", "messenger", "whatsapp", "instagram", "phone"];
 const ADVANCE_METHODS = ["bkash", "nagad", "rocket", "bank", "cash"];
@@ -21,6 +28,20 @@ const orderItemSchema = new mongoose.Schema(
     customNumber: { type: String, default: null },
     addOnsPrice: { type: Number, default: 0, min: 0 }, // add-ons per unit
     price: { type: Number, required: true, min: 0 }, // final price per unit (base + size extra + add-ons)
+  },
+  { _id: false },
+);
+
+// Customer delivery record from Steadfast (see services/steadfast.js)
+const riskSchema = new mongoose.Schema(
+  {
+    percent: { type: Number, default: null }, // risk % (null = new customer)
+    level: { type: String, enum: ["new", "low", "medium", "high"], required: true },
+    deliveryPercent: { type: Number, default: null },
+    cancelPercent: { type: Number, default: null },
+    reports: { type: Number, default: 0 }, // reports by other merchants
+    volume: { type: String, default: "" },
+    checkedAt: { type: Date, default: Date.now },
   },
   { _id: false },
 );
@@ -55,14 +76,13 @@ const orderSchema = new mongoose.Schema(
 
     // advance payment taken before delivery (the rest is Cash on Delivery)
     advancePaid: { type: Number, default: 0, min: 0 },
-    advanceMethod: {
-      type: String,
-      enum: [...ADVANCE_METHODS, ""],
-      default: "",
-    },
+    advanceMethod: { type: String, enum: [...ADVANCE_METHODS, ""], default: "" },
     advanceTrxId: { type: String, trim: true, maxlength: 40, default: "" },
 
     size: { type: String, default: null }, // legacy (old orders)
+
+    // Steadfast delivery record of this phone number (filled after the order is placed)
+    risk: { type: riskSchema, default: undefined },
 
     // set when an admin edits the order
     edited: { type: Boolean, default: false },

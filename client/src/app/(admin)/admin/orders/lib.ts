@@ -56,6 +56,17 @@ export type OrderItem = {
   price: number; // final price per unit
 };
 
+// Steadfast delivery record of the customer (filled by the server)
+export type Risk = {
+  percent: number | null; // % of parcels not delivered (null = new customer)
+  level: "new" | "low" | "medium" | "high";
+  deliveryPercent: number | null;
+  cancelPercent: number | null;
+  reports: number;
+  volume?: string;
+  checkedAt?: string;
+};
+
 export type Order = {
   _id: string;
   customerName: string;
@@ -69,6 +80,7 @@ export type Order = {
   status: OrderStatus;
   source?: OrderSource;
   edited?: boolean;
+  risk?: Risk;
   isPreorder?: boolean;
   preorderNote?: string;
   originalTotal?: number | null;

@@ -51,17 +51,28 @@ async function sendToAll(payload) {
   return sent;
 }
 
-function orderPayload(order) {
+// One short line about the customer's Steadfast record
+function riskLine(risk) {
+  if (!risk) return "";
+  if (risk.level === "new") return "🆕 New customer (no Steadfast history)";
+  const icon = risk.level === "high" ? "🔴" : risk.level === "medium" ? "🟠" : "🟢";
+  const reports = risk.reports > 0 ? ` · ${risk.reports} report(s)` : "";
+  return `${icon} Risk ${risk.percent}% (${risk.level})${reports}`;
+}
+
+function orderPayload(order, risk) {
   const id = String(order._id).slice(-6).toUpperCase();
   const items = order.items || [];
   const first = items[0];
   const more = items.length > 1 ? ` +${items.length - 1} more` : "";
+  const danger = risk && risk.level === "high" ? "⚠️ " : "";
 
   return {
-    title: `🛒 New order #${id}${order.isPreorder ? " · PRE-ORDER" : ""}`,
+    title: `${danger}🛒 New order #${id}${order.isPreorder ? " · PRE-ORDER" : ""}`,
     body: [
       `${order.customerName} · ${money(order.totalPrice)}`,
       first ? `${first.name} × ${first.quantity}${more}` : "",
+      riskLine(risk),
     ]
       .filter(Boolean)
       .join("\n"),
@@ -71,9 +82,9 @@ function orderPayload(order) {
 }
 
 // Never throws and is never awaited by the order flow
-function notifyNewOrder(order) {
+function notifyNewOrder(order, risk = null) {
   try {
-    const payload = orderPayload(order);
+    const payload = orderPayload(order, risk);
     sendToAll(payload)
       .then((n) => console.log(`Push ${payload.tag}: sent to ${n} device(s)`))
       .catch((err) => console.error("Notify failed:", err.message));

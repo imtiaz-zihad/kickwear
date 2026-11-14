@@ -16,6 +16,7 @@ import {
 import type { AdvancePayload, EditPayload, Order, OrderStatus } from "./lib";
 import { Chip, ItemLine, OrderModal, productionNote } from "./OrderParts";
 import NewOrderModal from "./NewOrderModal";
+import { RiskChip } from "./RiskParts";
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -48,7 +49,7 @@ export default function OrdersPage() {
     };
   }, []);
 
-    // the admin layout fires this when a new order arrives
+  // the admin layout fires this when a new order arrives
   useEffect(() => {
     const reload = () => {
       api<{ data?: Order[] } | Order[]>("/orders?limit=200&noCache=true")
@@ -115,6 +116,13 @@ export default function OrdersPage() {
         ? `Order #${shortId(updated)}: advance ${money(payload.amount)} saved`
         : `Order #${shortId(updated)}: advance removed`,
     );
+  };
+
+  // a Steadfast re-check returns the updated order
+  const applyUpdated = (updated: Order) => {
+    setOrders((prev) => prev.map((o) => (o._id === updated._id ? updated : o)));
+    setSelected((s) => (s && s._id === updated._id ? updated : s));
+    flash(`Order #${shortId(updated)}: customer record updated`);
   };
 
   const handleCreated = (order: Order) => {
@@ -266,6 +274,7 @@ export default function OrdersPage() {
                       <Chip accent>{SOURCE_LABEL[order.source]}</Chip>
                     )}
                     {order.edited && <Chip>Edited</Chip>}
+                    <RiskChip risk={order.risk} />
                   </div>
 
                   {order.isPreorder && (
@@ -341,6 +350,7 @@ export default function OrdersPage() {
           onCopyNote={copyNote}
           onSaveEdit={saveEdit}
           onSaveAdvance={saveAdvance}
+          onRiskChecked={applyUpdated}
         />
       )}
 

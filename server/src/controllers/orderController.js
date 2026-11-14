@@ -6,11 +6,23 @@ const { sendSMS, SMS_MESSAGES } = require("../services/smsService");
 const mongoose = require("mongoose");
 const { sendPurchase } = require("../services/metaCapi");
 const { sizeExtra: extraForSize } = require("../utils/sizes");
+const { notifyNewOrder } = require("../services/notify");
+const { checkCustomer, inspectCustomer, isConfigured } = require("../services/steadfast");
 
 const CACHE_TTL = {
   ORDER_LIST: 100,
   TRACK_ORDER: 30,
 };
+
+// Looks up the customer on Steadfast and saves the result on the order.
+// Returns the risk, or null if it could not be checked.
+async function attachRisk(order) {
+  const risk = await checkCustomer(order.phone);
+  if (!risk) return null;
+  await Order.updateOne({ _id: order._id }, { $set: { risk } });
+  invalidateCache("orders:");
+  return risk;
+}
 
 // Channels an admin may tag a manually created order with
 const ADMIN_SOURCES = ["messenger", "whatsapp", "instagram", "phone"];
@@ -216,6 +228,15 @@ exports.createOrder = async (req, res) => {
       }
     }
 
+    // 11. Check the customer's delivery record (Steadfast), then tell the owner
+    //     by phone notification (website orders only). Runs after the response,
+    //     so the order never waits for it.
+    attachRisk(order)
+      .catch(() => null)
+      .then((risk) => {
+        if (!req.adminCreated) notifyNewOrder(order, risk);
+      });
+
     return res.status(201).json(order);
   } catch (err) {
     console.error("Create Order Error:", err);
@@ -289,7 +310,7 @@ exports.trackOrder = async (req, res) => {
 // Query: page, limit, status, preorder=true|false
 exports.getOrders = async (req, res) => {
   try {
-    const { page = 1, limit = 50, status, preorder } = req.query;
+    const { page = 1, limit = 50, status, preorder, since } = req.query;
     const noCache = req.query.noCache === "true";
 
     const cacheKey = `orders:${JSON.stringify(req.query)}`;
@@ -301,6 +322,11 @@ exports.getOrders = async (req, res) => {
 
     const query = {};
     if (status) query.status = status;
+    // since=<ISO date> → only orders created after it (new-order badge)
+    if (since) {
+      const d = new Date(String(since));
+      if (!Number.isNaN(d.getTime())) query.createdAt = { $gt: d };
+    }
     if (preorder === "true") query.isPreorder = true;
     else if (preorder === "false") query.isPreorder = { $ne: true };
 
@@ -324,7 +350,7 @@ exports.getOrders = async (req, res) => {
 };
 
 // ✅ Admin edit: size / quantity / unit price / delivery charge
-// Only while the order is Pending or Confirmed (before it goes to the courier)
+// Only before it goes to the courier (Pending, Confirmed or Collecting)
 exports.updateOrder = async (req, res) => {
   try {
     const { id } = req.params;
@@ -345,9 +371,7 @@ exports.updateOrder = async (req, res) => {
 
     if (items !== undefined) {
       if (!Array.isArray(items) || items.length !== order.items.length) {
-        return res
-          .status(400)
-          .json({ message: "Items do not match this order" });
+        return res.status(400).json({ message: "Items do not match this order" });
       }
 
       for (let i = 0; i < items.length; i++) {
@@ -361,9 +385,7 @@ exports.updateOrder = async (req, res) => {
               : null;
           if (size) {
             const product = mongoose.isValidObjectId(item.productId)
-              ? await Product.findById(item.productId)
-                  .select("sizes name")
-                  .lean()
+              ? await Product.findById(item.productId).select("sizes name").lean()
               : null;
             if (product?.sizes?.length && !product.sizes.includes(size)) {
               return res.status(400).json({
@@ -418,10 +440,7 @@ exports.updateOrder = async (req, res) => {
     // remember the original total once, for discount tracking
     if (order.originalTotal == null) order.originalTotal = order.totalPrice;
 
-    const itemsTotal = order.items.reduce(
-      (s, it) => s + it.price * it.quantity,
-      0,
-    );
+    const itemsTotal = order.items.reduce((s, it) => s + it.price * it.quantity, 0);
     order.totalPrice = itemsTotal + order.deliveryCharge;
 
     // the customer already paid part of it: the total cannot drop below that
@@ -474,11 +493,7 @@ exports.updateAdvance = async (req, res) => {
     // clearing the amount clears the details too
     order.advanceMethod = amount > 0 ? method : "";
     order.advanceTrxId =
-      amount > 0
-        ? String(req.body?.trxId || "")
-            .trim()
-            .slice(0, 40)
-        : "";
+      amount > 0 ? String(req.body?.trxId || "").trim().slice(0, 40) : "";
 
     await order.save();
 
@@ -489,5 +504,54 @@ exports.updateAdvance = async (req, res) => {
   } catch (err) {
     console.error("Update Advance Error:", err);
     res.status(500).json({ message: "Failed to update advance" });
+  }
+};
+
+// ✅ Admin: re-check one order's customer on Steadfast (and save the result)
+exports.refreshRisk = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ message: "Invalid order id" });
+    }
+    if (!isConfigured()) {
+      return res.status(503).json({ message: "Steadfast keys are not set on the server" });
+    }
+
+    const order = await Order.findById(id).select("phone").lean();
+    if (!order) return res.status(404).json({ message: "Order not found" });
+
+    const risk = await checkCustomer(order.phone, { force: true });
+    if (!risk) {
+      return res
+        .status(502)
+        .json({ message: "Steadfast check failed. Try again in a few minutes." });
+    }
+
+    const updated = await Order.findByIdAndUpdate(
+      id,
+      { $set: { risk } },
+      { returnDocument: "after" },
+    ).lean();
+    invalidateCache("orders:");
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// ✅ Admin debug: the real Steadfast answer for any phone + how we read it
+exports.inspectRisk = async (req, res) => {
+  const { phone } = req.params;
+  if (!/^01[3-9]\d{8}$/.test(phone)) {
+    return res.status(400).json({ message: "Invalid phone number" });
+  }
+  try {
+    res.json(await inspectCustomer(phone));
+  } catch (err) {
+    res.status(err.status || err.response?.status || 502).json({
+      message: err.message,
+      steadfast: err.response?.data ?? null,
+    });
   }
 };

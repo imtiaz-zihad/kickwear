@@ -7,6 +7,8 @@ const {
   updateOrder,
   updateAdvance,
   trackOrder,
+  refreshRisk,
+  inspectRisk,
 } = require("../controllers/orderController");
 const { requireAdmin } = require("../middleware/adminAuth");
 
@@ -20,6 +22,8 @@ router.post("/", createOrder); // public (customers)
 router.post("/admin-create", requireAdmin, markAdminCreated, createOrder);
 router.get("/", requireAdmin, getOrders);
 router.get("/track/:phone", trackOrder); // public (customers)
+router.get("/risk/:phone", requireAdmin, inspectRisk); // debug: raw Steadfast answer
+router.post("/:id/risk", requireAdmin, refreshRisk); // re-check one order
 router.patch("/:id/status", requireAdmin, updateStatus);
 router.patch("/:id/advance", requireAdmin, updateAdvance);
 router.patch("/:id", requireAdmin, updateOrder);

@@ -25,6 +25,7 @@ import {
   printText,
   shortId,
 } from "./lib";
+import { RiskPanel } from "./RiskParts";
 import type { AdvancePayload, EditPayload, Order, OrderItem, OrderStatus } from "./lib";
 
 const SIZE_OPTIONS = ["S", "M", "L", "XL", "2XL", "3XL", "4XL"];
@@ -92,6 +93,7 @@ export function OrderModal({
   onCopyNote,
   onSaveEdit,
   onSaveAdvance,
+  onRiskChecked,
 }: {
   selected: Order;
   updatingId: string | null;
@@ -100,6 +102,7 @@ export function OrderModal({
   onCopyNote: (order: Order) => void;
   onSaveEdit: (order: Order, payload: EditPayload) => Promise<void>;
   onSaveAdvance: (order: Order, payload: AdvancePayload) => Promise<void>;
+  onRiskChecked: (updated: Order) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Draft[]>([]);
@@ -311,6 +314,8 @@ export function OrderModal({
             </select>
           </div>
         </div>
+
+        <RiskPanel order={selected} onChecked={onRiskChecked} />
 
         {/* Items */}
         <div className="mb-2 flex items-center justify-between gap-2">
