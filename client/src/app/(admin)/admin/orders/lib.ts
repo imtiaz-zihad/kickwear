@@ -121,6 +121,51 @@ export const itemSize = (o: Order, i: OrderItem) => i.size ?? o.size ?? null;
 export const printText = (i: OrderItem) =>
   [i.customName, i.customNumber].filter(Boolean).join(" ");
 
+// WhatsApp message to the customer: what they ordered, the amount, and a
+// question asking them to confirm. (Pending orders ask to confirm; later
+// statuses only send the summary.)
+export const orderWhatsAppText = (o: Order): string => {
+  const lines: string[] = [
+    `আসসালামু আলাইকুম ${o.customerName}, Kick Wear থেকে বলছি। 😊`,
+    "",
+    `আপনার অর্ডার #${shortId(o)}${o.isPreorder ? " (Pre-order)" : ""}:`,
+    "",
+  ];
+
+  o.items.forEach((it, i) => {
+    const parts = [
+      it.name,
+      itemSize(o, it) && `Size ${itemSize(o, it)}`,
+      it.uclPatch && "UCL patch",
+      printText(it) && `Print: ${printText(it)}`,
+    ].filter(Boolean);
+    lines.push(
+      `${i + 1}) ${parts.join(" | ")} × ${it.quantity} = ${money(it.price * it.quantity)}`,
+    );
+  });
+
+  lines.push("");
+  lines.push(`🚚 Delivery (${areaLabel(getArea(o))}): ${money(o.deliveryCharge)}`);
+  lines.push(`✅ Total: ${money(o.totalPrice)}`);
+  if ((o.advancePaid ?? 0) > 0) {
+    lines.push(`💵 Advance paid: ${money(o.advancePaid ?? 0)}`);
+    lines.push(`💰 Delivery-র সময় দিতে হবে: ${money(dueAmount(o))}`);
+  } else {
+    lines.push("💰 Cash on Delivery");
+  }
+
+  if (o.address) lines.push("", `📍 ${o.address}`);
+  if (o.isPreorder && o.preorderNote) lines.push("", `⏳ Pre-order: ${o.preorderNote}`);
+
+  if (o.status === "Pending") {
+    lines.push("", 'আপনার অর্ডারটি কি আমরা কনফার্ম করবো? কনফার্ম করতে "হ্যাঁ" লিখে রিপ্লাই দিন। 🙏');
+  } else {
+    lines.push("", `অর্ডারের বর্তমান অবস্থা: ${o.status}`);
+  }
+
+  return lines.join("\n");
+};
+
 const authHeaders = (): Record<string, string> => {
   try {
     const t = localStorage.getItem("adminToken");

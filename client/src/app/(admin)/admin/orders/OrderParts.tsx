@@ -22,6 +22,7 @@ import {
   getArea,
   itemSize,
   money,
+  orderWhatsAppText,
   printText,
   shortId,
 } from "./lib";
@@ -268,7 +269,7 @@ export function OrderModal({
                 <Phone className="h-3.5 w-3.5" /> Call
               </a>
               <a
-                href={`https://wa.me/88${selected.phone}`}
+                href={`https://wa.me/88${selected.phone}?text=${encodeURIComponent(orderWhatsAppText(selected))}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 text-green-600"

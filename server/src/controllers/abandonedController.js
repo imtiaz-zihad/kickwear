@@ -2,10 +2,15 @@
 const mongoose = require("mongoose");
 const AbandonedCheckout = require("../models/AbandonedCheckout");
 const Order = require("../models/Order");
+const Product = require("../models/Product");
+const { sizeExtra: extraForSize } = require("../utils/sizes");
 
 const BD_PHONE = /^01[3-9]\d{8}$/;
 const SESSION_ID = /^[A-Za-z0-9_-]{10,64}$/;
 const clip = (v, n) => (typeof v === "string" ? v.trim().slice(0, n) : "");
+
+// same delivery charges as orderController
+const deliveryFor = (area) => (area === "outside" ? 130 : 70);
 
 // POST /api/abandoned  (public, called from the checkout page)
 // Upserts one record per browser session. Always answers 200 so the
@@ -48,6 +53,9 @@ exports.capture = async (req, res) => {
 
 // GET /api/abandoned  (admin) — newest first, each flagged `converted`
 // when the same phone placed an order after the checkout was started.
+// Each lead also gets unitPrice / deliveryCharge / total (current product
+// price + 3XL/4XL extra + delivery) so the admin can WhatsApp the exact amount.
+// UCL patch / name printing are not saved with a lead, so they are not in it.
 exports.list = async (req, res) => {
   try {
     const limit = Math.min(200, parseInt(req.query.limit) || 100);
@@ -69,13 +77,34 @@ exports.list = async (req, res) => {
       .select("phone createdAt")
       .lean();
 
+    const productIds = [
+      ...new Set(docs.map((d) => d.productId).filter((id) => mongoose.isValidObjectId(id))),
+    ];
+    const products = productIds.length
+      ? await Product.find({ _id: { $in: productIds } })
+          .select("discountedPrice availability preorderNote")
+          .lean()
+      : [];
+    const productById = new Map(products.map((p) => [String(p._id), p]));
+
     res.json(
-      docs.map((d) => ({
-        ...d,
-        converted: orders.some(
-          (o) => o.phone === d.phone && o.createdAt >= d.createdAt,
-        ),
-      })),
+      docs.map((d) => {
+        const p = productById.get(d.productId);
+        const deliveryCharge = deliveryFor(d.deliveryArea);
+        const unitPrice = p ? p.discountedPrice + extraForSize(d.size) : null;
+
+        return {
+          ...d,
+          converted: orders.some(
+            (o) => o.phone === d.phone && o.createdAt >= d.createdAt,
+          ),
+          unitPrice,
+          deliveryCharge,
+          total: unitPrice === null ? null : unitPrice * d.quantity + deliveryCharge,
+          isPreorder: p?.availability === "preorder",
+          preorderNote: p?.preorderNote || "",
+        };
+      }),
     );
   } catch (err) {
     res.status(500).json({ message: err.message });

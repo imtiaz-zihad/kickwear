@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, MessageCircle, Phone, RefreshCw, Trash2 } from "lucide-react";
-import { api, areaLabel } from "../orders/lib";
+import { api, areaLabel, money } from "../orders/lib";
 
 type Lead = {
   _id: string;
@@ -16,6 +16,12 @@ type Lead = {
   contacted: boolean;
   converted: boolean;
   lastSeenAt: string;
+  // calculated by the server from the current product price
+  unitPrice: number | null;
+  deliveryCharge: number;
+  total: number | null;
+  isPreorder?: boolean;
+  preorderNote?: string;
 };
 
 type Tab = "open" | "ordered" | "all";
@@ -25,6 +31,31 @@ const ago = (iso: string) => {
   if (mins < 60) return `${mins}m ago`;
   if (mins < 1440) return `${Math.round(mins / 60)}h ago`;
   return `${Math.round(mins / 1440)}d ago`;
+};
+
+// WhatsApp message: product details + amount, asking the customer to confirm
+const leadWhatsAppText = (l: Lead): string => {
+  const lines: string[] = [
+    `আসসালামু আলাইকুম${l.customerName ? ` ${l.customerName}` : ""}, Kick Wear থেকে বলছি। 😊`,
+    "",
+    "আপনি আমাদের ওয়েবসাইটে এই অর্ডারটি করতে চেয়েছিলেন:",
+    "",
+    `🛍 ${l.productName || "আমাদের প্রোডাক্ট"}`,
+  ];
+  if (l.size) lines.push(`📏 Size: ${l.size}`);
+  lines.push(`🔢 Quantity: ${l.quantity}`);
+
+  if (l.unitPrice !== null && l.total !== null) {
+    lines.push(`💰 Price: ${money(l.unitPrice)} × ${l.quantity} = ${money(l.unitPrice * l.quantity)}`);
+    lines.push(`🚚 Delivery (${areaLabel(l.deliveryArea)}): ${money(l.deliveryCharge)}`);
+    lines.push(`✅ Total: ${money(l.total)} (Cash on Delivery)`);
+  }
+
+  if (l.address) lines.push("", `📍 ${l.address}`);
+  if (l.isPreorder) lines.push("", `⏳ Pre-order${l.preorderNote ? `: ${l.preorderNote}` : ""}`);
+
+  lines.push("", 'আপনার অর্ডারটি কি আমরা কনফার্ম করবো? কনফার্ম করতে "হ্যাঁ" লিখে রিপ্লাই দিন। 🙏');
+  return lines.join("\n");
 };
 
 export default function AbandonedPage() {
@@ -87,12 +118,8 @@ export default function AbandonedPage() {
     }
   };
 
-  const waLink = (l: Lead) => {
-    const text = `আসসালামু আলাইকুম${l.customerName ? ` ${l.customerName}` : ""}, Kick Wear থেকে বলছি। আপনি ${
-      l.productName || "আমাদের প্রোডাক্ট"
-    } অর্ডার করছিলেন, কোনো সমস্যা হয়েছে? আমরা সাহায্য করতে পারি 😊`;
-    return `https://wa.me/88${l.phone}?text=${encodeURIComponent(text)}`;
-  };
+  const waLink = (l: Lead) =>
+    `https://wa.me/88${l.phone}?text=${encodeURIComponent(leadWhatsAppText(l))}`;
 
   const counts = {
     open: leads.filter((l) => !l.converted).length,
@@ -171,6 +198,11 @@ export default function AbandonedPage() {
                   >
                     {areaLabel(l.deliveryArea)}
                   </span>
+                  {l.isPreorder && (
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                      Pre-order
+                    </span>
+                  )}
                   {l.converted && (
                     <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
                       Ordered later
@@ -187,6 +219,14 @@ export default function AbandonedPage() {
                 <p className="text-sm">
                   {l.productName || "Product"} · {l.size ? `Size ${l.size} · ` : ""}× {l.quantity}
                 </p>
+                {l.total !== null && (
+                  <p className="text-sm font-semibold text-primary">
+                    {money(l.total)}{" "}
+                    <span className="text-xs font-normal text-muted-foreground">
+                      (incl. {money(l.deliveryCharge)} delivery)
+                    </span>
+                  </p>
+                )}
                 <p className="text-xs text-muted-foreground">Last active {ago(l.lastSeenAt)}</p>
               </div>
 
