@@ -1,4 +1,4 @@
-import { MapPin, Phone, Star, Truck } from "lucide-react";
+import { MapPin, Phone, RotateCcw, Star, Truck } from "lucide-react";
 import Link from "next/link";
 
 const WHATSAPP_NUMBER = "88018940302115";
@@ -106,6 +106,15 @@ export default function Footer() {
             >
               <Star className="h-3.5 w-3.5 text-primary" />
               Customer Reviews
+            </Link>
+
+            {/* Return Policy */}
+            <Link
+              href="/return-policy"
+              className="hover:text-primary transition-colors flex items-center gap-2"
+            >
+              <RotateCcw className="h-3.5 w-3.5 text-primary" />
+              Return Policy
             </Link>
 
             {/* WhatsApp */}

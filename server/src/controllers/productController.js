@@ -77,6 +77,36 @@ const toInt = (value, fallback, min = 1, max = Infinity) => {
   return Math.min(Math.max(n, min), max);
 };
 
+// "Barcelona Home 26/27 Half Sleeve" and "Barcelona Home 26/27" → same key,
+// so the half and full sleeve versions of one jersey match each other
+const pairKey = (name = "") =>
+  String(name)
+    .toLowerCase()
+    .replace(/\b(half|full)[\s-]*sleeves?\b/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
+// The same jersey in the other sleeve (null if there is none)
+const findSibling = async (product) => {
+  if (!product.sleeve) return null;
+
+  const filter = {
+    _id: { $ne: product._id },
+    category: product.category,
+    sleeve: product.sleeve === "half" ? "full" : "half",
+  };
+  if (product.subcategory) filter.subcategory = product.subcategory;
+  if (product.season) filter.season = product.season;
+
+  const candidates = await Product.find(filter)
+    .select("name slug sleeve discountedPrice availability stock")
+    .limit(50)
+    .lean();
+
+  const key = pairKey(product.name);
+  return candidates.find((c) => pairKey(c.name) === key) || null;
+};
+
 const calcDiscount = (original, discounted) =>
   original > 0 ? Math.round(((original - discounted) / original) * 100) : 0;
 
@@ -179,6 +209,9 @@ exports.getSingleProduct = async (req, res) => {
       : await Product.findOne({ slug: String(id).toLowerCase() }).lean();
     if (!data) return res.status(404).json({ message: "Product not found" });
 
+    // half ↔ full sleeve link (found automatically, nothing to set in admin)
+    data.sibling = await findSibling(data);
+
     setCache(cacheKey, data, CACHE_TTL.SINGLE_PRODUCT);
     res.json(data);
   } catch (err) {
@@ -210,6 +243,7 @@ exports.addProduct = async (req, res) => {
     });
 
     invalidateCache("products:");
+    invalidateCache("product:"); // the other sleeve's page shows this one
 
     res.status(201).json(product);
   } catch (err) {
@@ -261,9 +295,9 @@ exports.updateProduct = async (req, res) => {
       runValidators: true,
     }).lean();
 
-    // The product is cached under both its ID and its slug
-    invalidateCache(`product:${req.params.id}`);
-    if (data?.slug) invalidateCache(`product:${data.slug}`);
+    // single products are cached under ID and slug, and each one also holds
+    // its other-sleeve link, so clear them all
+    invalidateCache("product:");
     invalidateCache("products:");
 
     res.json(data);
@@ -278,8 +312,7 @@ exports.deleteProduct = async (req, res) => {
     const data = await Product.findByIdAndDelete(req.params.id).lean();
     if (!data) return res.status(404).json({ message: "Product not found" });
 
-    invalidateCache(`product:${req.params.id}`);
-    if (data.slug) invalidateCache(`product:${data.slug}`);
+    invalidateCache("product:");
     invalidateCache("products:");
 
     res.json({ message: "Product deleted successfully" });

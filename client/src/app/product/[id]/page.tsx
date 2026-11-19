@@ -75,6 +75,7 @@ export default async function ProductDetails({
         : 0;
 
   const sleeve = product.sleeve ? SLEEVE_LABEL[product.sleeve] : null;
+  const sibling = product.sleeve && product.sibling ? product.sibling : null;
   const isPreorder = product.availability === "preorder";
   // pre-order products can be ordered even when stock is 0
   const outOfStock =
@@ -170,6 +171,57 @@ export default async function ProductDetails({
               </>
             )}
           </div>
+
+          {/* Half ↔ Full sleeve switch (only when both versions exist) */}
+          {sibling && product.sleeve && (
+            <div>
+              <p className="mb-2 text-sm font-semibold text-foreground">Sleeve</p>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  {
+                    sleeve: product.sleeve,
+                    price: product.discountedPrice,
+                    href: null as string | null,
+                  },
+                  {
+                    sleeve: sibling.sleeve,
+                    price: sibling.discountedPrice,
+                    href: `/product/${sibling.slug ?? sibling._id}`,
+                  },
+                ]
+                  .sort((a, b) => (a.sleeve === "half" ? -1 : b.sleeve === "half" ? 1 : 0))
+                  .map((o) => {
+                    const body = (
+                      <>
+                        <span className="block text-sm font-semibold">
+                          {SLEEVE_LABEL[o.sleeve]}
+                        </span>
+                        <span className="block text-xs opacity-80">
+                          ৳{o.price.toLocaleString()}
+                        </span>
+                      </>
+                    );
+                    return o.href ? (
+                      <Link
+                        key={o.sleeve}
+                        href={o.href}
+                        className="rounded-xl border border-border bg-card px-4 py-2.5 text-center transition-colors hover:border-primary/60"
+                      >
+                        {body}
+                      </Link>
+                    ) : (
+                      <div
+                        key={o.sleeve}
+                        aria-current="true"
+                        className="rounded-xl border border-primary bg-primary px-4 py-2.5 text-center text-primary-foreground"
+                      >
+                        {body}
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
 
           {/* Description */}
           {product.description && (

@@ -16,6 +16,17 @@ export interface ProductAddOns {
   customPrint?: AddOnConfig; // name + number printing
 }
 
+// The same jersey in the other sleeve (added by the server on the product page)
+export interface SiblingProduct {
+  _id: string;
+  name: string;
+  slug?: string;
+  sleeve: Sleeve;
+  discountedPrice: number;
+  availability?: Availability;
+  stock?: number;
+}
+
 export interface Product {
   _id: string;
   name: string; // "Barcelona Home 26/27"
@@ -35,6 +46,7 @@ export interface Product {
   slug?: string; // clean URL: "real-madrid-26-27-home-full-sleeve"
   availability?: Availability;
   preorderNote?: string; // "Delivery 20-25 Nov"
+  sibling?: SiblingProduct | null; // half ↔ full sleeve link
   createdAt?: string;
   updatedAt?: string;
 }
