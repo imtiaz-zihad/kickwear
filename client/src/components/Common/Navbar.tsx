@@ -52,7 +52,7 @@ const Navbar = () => {
   return (
     <header className="sticky top-0 z-50 border-b border-border/50 bg-background/90 backdrop-blur-xl">
       {/* TOP NAVBAR */}
-      <div className="container flex h-14 items-center justify-between px-4 md:h-24 md:px-6">
+      <div className="container flex h-14 items-center justify-between px-4 md:h-16 md:px-6">
         {/* LOGO */}
         <Link
           href="/"
@@ -65,10 +65,10 @@ const Navbar = () => {
             width={80}
             height={80}
             priority
-            className="h-11 w-11 object-contain md:h-20 md:w-20"
+            className="h-11 w-11 object-contain md:h-14 md:w-14"
           />
 
-          <span className="-ml-1 whitespace-nowrap font-display text-2xl font-extrabold leading-none tracking-tight text-foreground md:-ml-2 md:text-3xl">
+          <span className="-ml-1 whitespace-nowrap font-display text-2xl font-extrabold leading-none tracking-tight text-foreground md:-ml-1.5 md:text-2xl">
             Kick <span className="gradient-text">Wear</span>
           </span>
         </Link>
@@ -82,7 +82,7 @@ const Navbar = () => {
               <Link
                 key={slug}
                 href={href}
-                className={`rounded-full px-5 py-2.5 text-base font-medium transition-all duration-200 ${
+                className={`rounded-full px-4 py-2 text-[15px] font-medium transition-all duration-200 ${
                   isActive(href)
                     ? "bg-primary text-primary-foreground"
                     : "text-muted-foreground hover:bg-secondary hover:text-foreground"
@@ -101,7 +101,7 @@ const Navbar = () => {
             href={`https://wa.me/${WHATSAPP_NUMBER}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="hidden items-center gap-1.5 rounded-full px-5 py-2.5 text-base font-medium text-green-600 transition-all duration-200 hover:bg-green-50 hover:text-green-700 lg:flex"
+            className="hidden items-center gap-1.5 rounded-full px-4 py-2 text-[15px] font-medium text-green-600 transition-all duration-200 hover:bg-green-50 hover:text-green-700 lg:flex"
           >
             <WhatsAppIcon className="h-5 w-5" />
             WhatsApp
@@ -110,7 +110,7 @@ const Navbar = () => {
           {/* REVIEWS - DESKTOP */}
           <Link
             href="/reviews"
-            className={`hidden items-center gap-1.5 rounded-full px-5 py-2.5 text-base font-medium transition-all duration-200 lg:flex ${
+            className={`hidden items-center gap-1.5 rounded-full px-4 py-2 text-[15px] font-medium transition-all duration-200 lg:flex ${
               isActive("/reviews")
                 ? "bg-primary text-primary-foreground"
                 : "text-muted-foreground hover:bg-secondary hover:text-foreground"
@@ -123,7 +123,7 @@ const Navbar = () => {
           {/* TRACK ORDER - DESKTOP */}
           <Link
             href="/track-order"
-            className={`hidden items-center gap-1.5 rounded-full px-5 py-2.5 text-base font-medium transition-all duration-200 lg:flex ${
+            className={`hidden items-center gap-1.5 rounded-full px-4 py-2 text-[15px] font-medium transition-all duration-200 lg:flex ${
               isActive("/track-order")
                 ? "bg-primary text-primary-foreground"
                 : "text-muted-foreground hover:bg-secondary hover:text-foreground"

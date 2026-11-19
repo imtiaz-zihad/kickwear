@@ -175,7 +175,7 @@ export default async function ProductDetails({
           {/* Half ↔ Full sleeve switch (only when both versions exist) */}
           {sibling && product.sleeve && (
             <div>
-              <p className="mb-2 text-sm font-semibold text-foreground">Sleeve</p>
+              <p className="mb-1 text-sm font-semibold text-foreground">Sleeve</p>
               <div className="grid grid-cols-2 gap-3">
                 {[
                   {
