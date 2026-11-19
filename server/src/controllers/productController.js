@@ -77,14 +77,29 @@ const toInt = (value, fallback, min = 1, max = Infinity) => {
   return Math.min(Math.max(n, min), max);
 };
 
-// "Barcelona Home 26/27 Half Sleeve" and "Barcelona Home 26/27" → same key,
-// so the half and full sleeve versions of one jersey match each other
-const pairKey = (name = "") =>
-  String(name)
-    .toLowerCase()
-    .replace(/\b(half|full)[\s-]*sleeves?\b/g, " ")
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
+// Words that do not tell two jerseys apart ("Kit" vs "Jersey", sleeve words)
+const PAIR_IGNORE = new Set([
+  "half", "full", "sleeve", "sleeves", "short", "long",
+  "kit", "kits", "jersey", "jerseys", "shirt", "shirts", "the", "new", "official",
+]);
+
+// One key for both sleeves of the same jersey, whatever the name order is:
+//   "Real Madrid Home Kit 26/27"         → "26 27 home madrid real"
+//   "Real Madrid 26/27 Home Full Sleeve" → "26 27 home madrid real"
+// 2026 and 26 count the same, and the season field is added too.
+const pairKey = (name = "", season = "") =>
+  [
+    ...new Set(
+      `${name} ${season}`
+        .toLowerCase()
+        .split(/[^a-z0-9]+/)
+        .filter(Boolean)
+        .map((w) => (/^20\d\d$/.test(w) ? w.slice(2) : w))
+        .filter((w) => !PAIR_IGNORE.has(w))
+    ),
+  ]
+    .sort()
+    .join(" ");
 
 // The same jersey in the other sleeve (null if there is none)
 const findSibling = async (product) => {
@@ -96,15 +111,18 @@ const findSibling = async (product) => {
     sleeve: product.sleeve === "half" ? "full" : "half",
   };
   if (product.subcategory) filter.subcategory = product.subcategory;
-  if (product.season) filter.season = product.season;
 
   const candidates = await Product.find(filter)
-    .select("name slug sleeve discountedPrice availability stock")
-    .limit(50)
+    .select("name slug sleeve season discountedPrice availability stock")
+    .limit(100)
     .lean();
 
-  const key = pairKey(product.name);
-  return candidates.find((c) => pairKey(c.name) === key) || null;
+  const key = pairKey(product.name, product.season);
+  const match = candidates.find((c) => pairKey(c.name, c.season) === key);
+  if (!match) return null;
+
+  const { season, ...sibling } = match; // season is only used for matching
+  return sibling;
 };
 
 const calcDiscount = (original, discounted) =>
