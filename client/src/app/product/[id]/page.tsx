@@ -112,8 +112,8 @@ export default async function ProductDetails({
       </nav>
 
       <div className="grid gap-8 lg:grid-cols-2 lg:gap-12">
-        {/* LEFT: images */}
-        <div className="relative self-start lg:sticky lg:top-24">
+        {/* LEFT: images (same size for every product) */}
+        <div className="relative mx-auto w-full max-w-130 self-start lg:sticky lg:top-24">
           {discount > 0 && (
             <span className="pointer-events-none absolute left-3 top-3 z-10 rounded-md bg-red-500 px-2.5 py-1 text-xs font-bold text-white shadow-sm">
               -{discount}%

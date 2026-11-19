@@ -31,7 +31,7 @@ export default function ProductImageCarousel({ images, name }: Props) {
   // No images → placeholder (next/image crashes on an empty src)
   if (!images || images.length === 0) {
     return (
-      <div className="flex aspect-square items-center justify-center rounded-2xl bg-secondary text-muted-foreground">
+      <div className="flex aspect-4/5 items-center justify-center rounded-2xl bg-secondary text-muted-foreground">
         <ShoppingBag className="h-12 w-12 opacity-30" />
       </div>
     );
@@ -41,21 +41,21 @@ export default function ProductImageCarousel({ images, name }: Props) {
 
   return (
     <div className="space-y-3">
-      {/* Main image */}
-      <div className="relative overflow-hidden rounded-2xl bg-secondary">
+      {/* Main image: every product gets the same 4:5 box, the whole image fits inside */}
+      <div className="relative overflow-hidden rounded-2xl bg-white">
         <div ref={emblaRef} className="overflow-hidden">
           <div className="flex">
             {images.map((src, i) => (
               <div
                 key={`${src}-${i}`}
-                className="relative aspect-square min-w-0 flex-[0_0_100%]"
+                className="relative aspect-4/5 min-w-0 flex-[0_0_100%] bg-white"
               >
                 <Image
                   src={src}
                   alt={`${name} - ${i + 1}`}
                   fill
-                  sizes="(max-width: 1024px) 100vw, 50vw"
-                  className="object-cover"
+                  sizes="(max-width: 520px) 100vw, 520px"
+                  className="object-contain"
                   priority={i === 0}
                 />
               </div>
