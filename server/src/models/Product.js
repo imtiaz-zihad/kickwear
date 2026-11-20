@@ -60,6 +60,11 @@ const productSchema = new mongoose.Schema(
     availability: { type: String, enum: AVAILABILITY, default: "in-stock" },
     // shown to customers on pre-order products, e.g. "Delivery 20-25 Nov"
     preorderNote: { type: String, trim: true, maxlength: 100, default: "" },
+
+    // manual display order set from the admin ("Arrange order"):
+    // higher number = shown earlier. Products without it come after the
+    // arranged ones, newest first.
+    priority: { type: Number },
   },
   { timestamps: true } // createdAt / updatedAt → "newest first" sorting
 );
@@ -68,6 +73,7 @@ const productSchema = new mongoose.Schema(
 productSchema.index({ category: 1, subcategory: 1 }); // category page + team filter
 productSchema.index({ isFeatured: 1 });
 productSchema.index({ createdAt: -1 });
+productSchema.index({ priority: -1, createdAt: -1 }); // default list order
 productSchema.index({ availability: 1 });
 
 module.exports = mongoose.model("Product", productSchema);

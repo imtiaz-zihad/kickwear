@@ -31,7 +31,8 @@ const ALLOWED_FIELDS = [
 ];
 
 const SORTS = {
-  newest: { createdAt: -1, _id: -1 },
+  // admin's arranged order first, then newest
+  newest: { priority: -1, createdAt: -1, _id: -1 },
   "price-asc": { discountedPrice: 1 },
   "price-desc": { discountedPrice: -1 },
 };
@@ -252,9 +253,17 @@ exports.addProduct = async (req, res) => {
     // Clean URL: created once, never changes when the product is renamed
     const slug = await uniqueSlug(Product, baseSlug(data));
 
+    // a new product is shown first in its category (the admin can move it)
+    const top = await Product.findOne({ category: data.category })
+      .sort({ priority: -1 })
+      .select("priority")
+      .lean();
+    const priority = (top?.priority ?? 0) + 1;
+
     const product = await Product.create({
       ...data,
       slug,
+      priority,
       originalPrice: original,
       discountedPrice: discounted,
       discountPercentage: calcDiscount(original, discounted),
@@ -334,6 +343,41 @@ exports.deleteProduct = async (req, res) => {
     invalidateCache("products:");
 
     res.json({ message: "Product deleted successfully" });
+  } catch (err) {
+    sendError(res, err);
+  }
+};
+
+// ─── Arrange order (admin) ──────────────────────────────────────────────────
+// PUT /api/products/order   { ids: ["<id of the first product>", "<2nd>", ...] }
+// The first id is shown first on the storefront.
+exports.reorderProducts = async (req, res) => {
+  try {
+    const ids = req.body?.ids;
+
+    if (!Array.isArray(ids) || ids.length === 0 || ids.length > 500) {
+      return res.status(400).json({ message: "ids must be a list of 1-500 product ids" });
+    }
+    if (!ids.every((id) => mongoose.isValidObjectId(id))) {
+      return res.status(400).json({ message: "Invalid product id in list" });
+    }
+    if (new Set(ids.map(String)).size !== ids.length) {
+      return res.status(400).json({ message: "Duplicate product id in list" });
+    }
+
+    // first = highest priority
+    await Product.bulkWrite(
+      ids.map((id, i) => ({
+        updateOne: {
+          filter: { _id: id },
+          update: { $set: { priority: ids.length - i } },
+        },
+      }))
+    );
+
+    invalidateCache("products:");
+
+    res.json({ message: "Order saved", count: ids.length });
   } catch (err) {
     sendError(res, err);
   }

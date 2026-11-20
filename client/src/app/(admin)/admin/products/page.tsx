@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, Package, Plus, Search } from "lucide-react";
-import { CATEGORIES, PAGE_SIZE, api } from "./lib";
+import { ArrowUpDown, Loader2, Package, Plus, Search } from "lucide-react";
+import { CATEGORIES, PAGE_SIZE, api, categoryLabel } from "./lib";
 import type { Product } from "./lib";
 import ProductForm from "./ProductForm";
+import ArrangeProducts from "./ArrangeProducts";
 import { CardSkeleton, ProductCard } from "./ProductCard";
 
 export default function ProductsPage() {
@@ -18,6 +19,7 @@ export default function ProductsPage() {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("all");
   const [editing, setEditing] = useState<Product | "new" | null>(null);
+  const [arranging, setArranging] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ text: string; error?: boolean } | null>(null);
 
@@ -56,6 +58,17 @@ export default function ProductsPage() {
       flash(err instanceof Error ? err.message : "Could not load more", true);
     } finally {
       setLoadingMore(false);
+    }
+  };
+
+  // the order was changed: reload the list so it matches the website
+  const handleArranged = async () => {
+    setArranging(false);
+    try {
+      setProducts(await loadPage(1));
+      flash("Order saved");
+    } catch (err) {
+      flash(err instanceof Error ? err.message : "Saved, but could not refresh", true);
     }
   };
 
@@ -125,13 +138,26 @@ export default function ProductsPage() {
           <h1 className="text-2xl font-bold md:text-3xl">Products</h1>
           <p className="text-muted-foreground">{total} total products</p>
         </div>
-        <button
-          type="button"
-          onClick={() => setEditing("new")}
-          className="inline-flex h-11 items-center gap-2 rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
-        >
-          <Plus className="h-4 w-4" /> Add Product
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() =>
+              category === "all"
+                ? flash("Pick a category first (Club Jersey, Country Jersey...)", true)
+                : setArranging(true)
+            }
+            className="inline-flex h-11 items-center gap-2 rounded-xl border border-border bg-card px-4 text-sm font-semibold hover:bg-secondary"
+          >
+            <ArrowUpDown className="h-4 w-4" /> Arrange order
+          </button>
+          <button
+            type="button"
+            onClick={() => setEditing("new")}
+            className="inline-flex h-11 items-center gap-2 rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
+          >
+            <Plus className="h-4 w-4" /> Add Product
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -219,6 +245,16 @@ export default function ProductsPage() {
           product={editing === "new" ? null : editing}
           onClose={() => setEditing(null)}
           onSaved={handleSaved}
+        />
+      )}
+
+      {/* Arrange order drawer (one category at a time) */}
+      {arranging && category !== "all" && (
+        <ArrangeProducts
+          category={category}
+          label={categoryLabel(category)}
+          onClose={() => setArranging(false)}
+          onSaved={handleArranged}
         />
       )}
 
