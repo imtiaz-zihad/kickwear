@@ -6,6 +6,7 @@ import { getSingleProduct } from "@/services/api";
 import { Product, Sleeve } from "@/types/product";
 import OrderButton from "@/components/Common/OrderButton";
 import ProductImageCarousel from "@/components/Product/ProductImageCarousel";
+import RelatedProducts from "@/components/Product/RelatedProducts";
 import ViewContentTracker from "@/components/Product/ViewContentTracker";
 
 const SLEEVE_LABEL: Record<Sleeve, string> = {
@@ -90,12 +91,12 @@ export default async function ProductDetails({
   ].filter(Boolean) as { label: string; value: string }[];
 
   return (
-    <div className="mx-auto max-w-7xl px-6 py-6">
+    <div className="mx-auto w-full max-w-7xl px-6 py-6">
       <ViewContentTracker product={product} />
       {/* Breadcrumb */}
       <nav
         aria-label="Breadcrumb"
-        className="mb-5 flex items-center gap-1 text-sm text-muted-foreground"
+        className="mb-5 flex min-w-0 items-center gap-1 text-sm text-muted-foreground"
       >
         <Link href="/" className="hover:text-foreground">
           Home
@@ -108,12 +109,12 @@ export default async function ProductDetails({
           {formatSlug(product.category)}
         </Link>
         <ChevronRight className="h-3.5 w-3.5 shrink-0" />
-        <span className="truncate text-foreground">{product.name}</span>
+        <span className="min-w-0 truncate text-foreground">{product.name}</span>
       </nav>
 
-      <div className="grid gap-8 lg:grid-cols-2 lg:gap-12">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[400px_minmax(0,1fr)] lg:gap-12">
         {/* LEFT: images (same size for every product) */}
-        <div className="relative mx-auto w-full max-w-130 self-start lg:sticky lg:top-24">
+        <div className="relative mx-auto w-full min-w-0 max-w-70 self-start sm:max-w-85 lg:mx-0 lg:max-w-none lg:sticky lg:top-24">
           {discount > 0 && (
             <span className="pointer-events-none absolute left-3 top-3 z-10 rounded-md bg-red-500 px-2.5 py-1 text-xs font-bold text-white shadow-sm">
               -{discount}%
@@ -123,7 +124,7 @@ export default async function ProductDetails({
         </div>
 
         {/* RIGHT: info */}
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           {/* Chips */}
           <div className="flex flex-wrap items-center gap-2">
             <Link
@@ -175,7 +176,7 @@ export default async function ProductDetails({
           {/* Half ↔ Full sleeve switch (only when both versions exist) */}
           {sibling && product.sleeve && (
             <div>
-              <p className="mb-1 text-sm font-semibold text-foreground">Sleeve</p>
+              <p className="mb-2 text-sm font-semibold text-foreground">Sleeve</p>
               <div className="grid grid-cols-2 gap-3">
                 {[
                   {
@@ -278,6 +279,9 @@ export default async function ProductDetails({
           )}
         </div>
       </div>
+
+      {/* More jerseys to look at */}
+      <RelatedProducts product={product} />
     </div>
   );
 }

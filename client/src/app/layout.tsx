@@ -31,7 +31,7 @@ export default function RootLayout({
       data-scroll-behavior="smooth"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
+      <body className="flex min-h-full w-full flex-col overflow-x-hidden *:min-w-0">
         <CartProvider>
           <LiveTracker />
           <LayoutWrapper>{children}</LayoutWrapper>

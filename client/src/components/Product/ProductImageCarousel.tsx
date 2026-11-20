@@ -54,7 +54,7 @@ export default function ProductImageCarousel({ images, name }: Props) {
                   src={src}
                   alt={`${name} - ${i + 1}`}
                   fill
-                  sizes="(max-width: 520px) 100vw, 520px"
+                  sizes="(max-width: 640px) 280px, 400px"
                   className="object-contain"
                   priority={i === 0}
                 />
@@ -99,7 +99,7 @@ export default function ProductImageCarousel({ images, name }: Props) {
               aria-label={`Show image ${i + 1}`}
               aria-current={i === selected}
               onClick={() => emblaApi?.scrollTo(i)}
-              className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border-2 transition ${
+              className={`relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border-2 transition ${
                 i === selected
                   ? "border-primary"
                   : "border-transparent opacity-70 hover:opacity-100"
@@ -109,7 +109,7 @@ export default function ProductImageCarousel({ images, name }: Props) {
                 src={src}
                 alt=""
                 fill
-                sizes="64px"
+                sizes="56px"
                 className="object-cover"
               />
             </button>
