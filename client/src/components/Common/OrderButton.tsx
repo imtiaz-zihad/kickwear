@@ -19,7 +19,7 @@ import { createOrder, type DeliveryArea, type Order } from "@/services/api";
 import { track, getMetaIds } from "@/lib/fbpixel";
 import { useAbandonedCheckout } from "@/lib/useAbandonedCheckout";
 import { useCart } from "@/lib/cart";
-import { sizeExtra } from "@/lib/sizes";
+import { KIDS_SIZE_CHART, isKidsSizes, sizeExtra } from "@/lib/sizes";
 
 // Mirrors the backend default. The backend recalculates the real price.
 const DEFAULT_ADDON_PRICE = 200;
@@ -237,7 +237,10 @@ export default function OrderButton({
   const deliveryCharge = DELIVERY[form.deliveryArea].charge;
   const total = subtotal + deliveryCharge;
 
-  const chartRow = SIZE_CHART.find((r) => r.size === size);
+  // kids products (sizes 16-28) get their own chart
+  const isKids = isKidsSizes(sizes);
+  const kidsRow = isKids ? KIDS_SIZE_CHART.find((r) => r.size === size) : undefined;
+  const chartRow = isKids ? undefined : SIZE_CHART.find((r) => r.size === size);
 
   // Save typed details (once a valid phone is entered) for follow-up
   useAbandonedCheckout({
@@ -255,7 +258,7 @@ export default function OrderButton({
     .join(" ");
   const waMessage = [
     `Hi! I want to ${preorder ? "pre-order" : "order"}: ${productName}`,
-    size && `Size: ${size}`,
+    size && `Size: ${size}${kidsRow ? ` (age ${kidsRow.age})` : ""}`,
     `Quantity: ${quantity}`,
     uclActive && "UCL patch: Yes",
     printActive && printText && `Name & number: ${printText}`,
@@ -490,7 +493,7 @@ export default function OrderButton({
             <div id={`${uid}-size`} className="scroll-mt-24">
               <div className="mb-2 flex items-center justify-between">
                 <span className="text-sm font-semibold">Size</span>
-                <SizeChart selectedSize={size} />
+                <SizeChart selectedSize={size} kids={isKids} />
               </div>
 
               <div
@@ -526,6 +529,14 @@ export default function OrderButton({
                   );
                 })}
               </div>
+
+              {kidsRow && (
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Size {kidsRow.size} (age {kidsRow.age}): Chest {kidsRow.chest} in ·
+                  Length {kidsRow.length} in{" "}
+                  <span className="text-xs">(1–2 in variation)</span>
+                </p>
+              )}
 
               {chartRow && (
                 <p className="mt-2 text-sm text-muted-foreground">

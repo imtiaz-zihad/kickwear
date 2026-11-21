@@ -43,7 +43,10 @@ export type FormState = {
   preorderNote: string;
 };
 
-export type SetField = <K extends keyof FormState>(key: K, value: FormState[K]) => void;
+export type SetField = <K extends keyof FormState>(
+  key: K,
+  value: FormState[K],
+) => void;
 
 export const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
@@ -62,6 +65,13 @@ export const SIZES = ["S", "M", "L", "XL", "2XL", "3XL", "4XL"];
 // a NEW product starts with these (3XL / 4XL are switched on per product)
 export const DEFAULT_SIZES = ["S", "M", "L", "XL", "2XL"];
 export const DEFAULT_ADDON_PRICE = 200;
+export const KIDS_CATEGORY = "kids-set";
+export const KIDS_SIZES = ["16", "18", "20", "22", "24", "26", "28"];
+export const DEFAULT_KIDS_SIZES = [...KIDS_SIZES];
+export const sizesFor = (category: string) =>
+  category === KIDS_CATEGORY ? KIDS_SIZES : SIZES;
+export const defaultSizesFor = (category: string) =>
+  category === KIDS_CATEGORY ? DEFAULT_KIDS_SIZES : DEFAULT_SIZES;
 export const PAGE_SIZE = 100;
 
 export const money = (n: number) => `৳${(n ?? 0).toLocaleString()}`;
@@ -70,7 +80,11 @@ export const categoryLabel = (slug: string) =>
   CATEGORIES.find((c) => c.slug === slug)?.label ?? slug;
 
 export const toSlug = (s: string) =>
-  s.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  s
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 
 export const fromSlug = (slug?: string) =>
   (slug ?? "")
@@ -108,7 +122,8 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
 
   const data = await res.json().catch(() => null);
-  if (!res.ok) throw new Error(data?.message || `Request failed (${res.status})`);
+  if (!res.ok)
+    throw new Error(data?.message || `Request failed (${res.status})`);
   return data as T;
 }
 
@@ -116,12 +131,16 @@ export async function uploadImage(file: File): Promise<string> {
   const fd = new FormData();
   fd.append("file", file);
   fd.append("upload_preset", UPLOAD_PRESET);
-  const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
-    method: "POST",
-    body: fd,
-  });
+  const res = await fetch(
+    `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
+    {
+      method: "POST",
+      body: fd,
+    },
+  );
   const data = await res.json().catch(() => null);
-  if (!res.ok || !data?.secure_url) throw new Error(data?.error?.message || "Upload failed");
+  if (!res.ok || !data?.secure_url)
+    throw new Error(data?.error?.message || "Upload failed");
   return data.secure_url as string;
 }
 

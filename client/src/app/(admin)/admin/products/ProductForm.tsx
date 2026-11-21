@@ -6,12 +6,13 @@ import { sizeExtra } from "@/lib/sizes";
 import {
   CATEGORIES,
   DEFAULT_ADDON_PRICE,
-  SIZES,
   api,
+  defaultSizesFor,
   emptyForm,
   field,
   formFromProduct,
   money,
+  sizesFor,
   toSlug,
   uploadImage,
 } from "./lib";
@@ -51,8 +52,23 @@ export default function ProductForm({
   const discountPct = pricesOk ? Math.round(((original - discounted) / original) * 100) : 0;
   const isPreorder = form.availability === "preorder";
 
+  const sizeOptions = sizesFor(form.category);
+  const isKidsCategory = form.category === "kids-set";
+
   const toggleSize = (s: string) =>
-    set("sizes", form.sizes.includes(s) ? form.sizes.filter((x) => x !== s) : SIZES.filter((x) => form.sizes.includes(x) || x === s));
+    set("sizes", form.sizes.includes(s) ? form.sizes.filter((x) => x !== s) : sizeOptions.filter((x) => form.sizes.includes(x) || x === s));
+
+  // kids and adult products use different size lists: switch the selection too
+  const changeCategory = (category: string) => {
+    const kidsBefore = form.category === "kids-set";
+    const kidsAfter = category === "kids-set";
+    setForm((f) => ({
+      ...f,
+      category,
+      sizes: kidsBefore === kidsAfter ? f.sizes : defaultSizesFor(category),
+    }));
+    setErrors((e) => ({ ...e, category: "", sizes: "" }));
+  };
 
   const handleUpload = async (files: FileList | null) => {
     if (!files?.length) return;
@@ -169,7 +185,7 @@ export default function ProductForm({
                 <select
                   id="p-category"
                   value={form.category}
-                  onChange={(e) => set("category", e.target.value)}
+                  onChange={(e) => changeCategory(e.target.value)}
                   className={field}
                 >
                   {CATEGORIES.map((c) => (
@@ -275,7 +291,7 @@ export default function ProductForm({
 
           <Section title="Sizes">
             <div className="flex flex-wrap gap-2">
-              {SIZES.map((s) => {
+              {sizeOptions.map((s) => {
                 const on = form.sizes.includes(s);
                 return (
                   <button
@@ -301,8 +317,9 @@ export default function ProductForm({
               })}
             </div>
             <p className="text-xs text-muted-foreground">
-              Customers can only pick the sizes selected here. 3XL and 4XL are added to
-              the price automatically.
+              {isKidsCategory
+                ? "Kids sizes (size number, age 1-14). Customers see the Kids Size Chart. No extra charge."
+                : "Customers can only pick the sizes selected here. 3XL and 4XL are added to the price automatically."}
             </p>
           </Section>
 
