@@ -5,6 +5,7 @@ const {
   getOrders,
   updateStatus,
   updateOrder,
+  mergeOrder,
   updateAdvance,
   trackOrder,
   refreshRisk,
@@ -26,6 +27,7 @@ router.get("/risk/:phone", requireAdmin, inspectRisk); // debug: raw Steadfast a
 router.post("/:id/risk", requireAdmin, refreshRisk); // re-check one order
 router.patch("/:id/status", requireAdmin, updateStatus);
 router.patch("/:id/advance", requireAdmin, updateAdvance);
+router.post("/:id/merge", requireAdmin, mergeOrder); // move another order into this one
 router.patch("/:id", requireAdmin, updateOrder);
 
 module.exports = router;

@@ -349,8 +349,91 @@ exports.getOrders = async (req, res) => {
   }
 };
 
-// ✅ Admin edit: size / quantity / unit price / delivery charge
-// Only before it goes to the courier (Pending, Confirmed or Collecting)
+// Builds one order item from a product + the admin's choices, with the same
+// checks and DB prices as createOrder. Returns { item, isPreorder } or
+// { status, error }.
+async function buildItem(input) {
+  const {
+    productId,
+    quantity,
+    size,
+    uclPatch = false,
+    customName,
+    customNumber,
+  } = input || {};
+
+  if (
+    !productId ||
+    !mongoose.isValidObjectId(productId) ||
+    !Number.isInteger(quantity) ||
+    quantity < 1 ||
+    quantity > 20 ||
+    typeof uclPatch !== "boolean"
+  ) {
+    return { status: 400, error: "Invalid product or quantity" };
+  }
+
+  const product = await Product.findById(productId);
+  if (!product) return { status: 404, error: "Product not found" };
+
+  const isPreorder = product.availability === "preorder";
+  if (!isPreorder && quantity > product.stock) {
+    return { status: 400, error: `Insufficient stock for ${product.name}` };
+  }
+
+  if (size && Array.isArray(product.sizes) && !product.sizes.includes(size)) {
+    return { status: 400, error: `Invalid size for ${product.name}` };
+  }
+
+  const patch = product.addOns?.uclPatch;
+  const printing = product.addOns?.customPrint;
+
+  if (uclPatch && !patch?.enabled) {
+    return { status: 400, error: `UCL patch is unavailable for ${product.name}` };
+  }
+
+  const hasName = typeof customName === "string" && customName.trim() !== "";
+  const hasNumber =
+    customNumber !== null &&
+    customNumber !== undefined &&
+    String(customNumber).trim() !== "";
+  if (hasName !== hasNumber) {
+    return { status: 400, error: "Custom name and number must be provided together" };
+  }
+  const wantsPrinting = hasName && hasNumber;
+  if (wantsPrinting && !printing?.enabled) {
+    return {
+      status: 400,
+      error: `Custom printing is unavailable for ${product.name}`,
+    };
+  }
+
+  const basePrice = product.discountedPrice;
+  const sizeExtra = extraForSize(size);
+  const addOnsPrice = (uclPatch ? patch.price : 0) + (wantsPrinting ? printing.price : 0);
+
+  return {
+    isPreorder,
+    item: {
+      productId: product._id.toString(),
+      name: product.name,
+      image: product.images?.[0] || null,
+      size: size || null,
+      quantity,
+      basePrice,
+      sizeExtra,
+      uclPatch,
+      customName: wantsPrinting ? customName.trim() : null,
+      customNumber: wantsPrinting ? String(customNumber).trim() : null,
+      addOnsPrice,
+      price: basePrice + sizeExtra + addOnsPrice,
+    },
+  };
+}
+
+// ✅ Admin edit: size / quantity / unit price / delivery charge, and add more
+// jerseys (addItems). Only before it goes to the courier (Pending, Confirmed
+// or Collecting)
 exports.updateOrder = async (req, res) => {
   try {
     const { id } = req.params;
@@ -367,7 +450,7 @@ exports.updateOrder = async (req, res) => {
         .json({ message: `A ${order.status} order cannot be edited` });
     }
 
-    const { items, deliveryCharge } = req.body || {};
+    const { items, deliveryCharge, addItems } = req.body || {};
 
     if (items !== undefined) {
       if (!Array.isArray(items) || items.length !== order.items.length) {
@@ -429,6 +512,26 @@ exports.updateOrder = async (req, res) => {
       }
     }
 
+    // add more jerseys to this order (same prices + checks as a new order)
+    if (addItems !== undefined) {
+      if (!Array.isArray(addItems) || addItems.length === 0 || addItems.length > 10) {
+        return res.status(400).json({ message: "Invalid jerseys to add" });
+      }
+      for (const input of addItems) {
+        const built = await buildItem(input);
+        if (built.error) {
+          return res.status(built.status).json({ message: built.error });
+        }
+        if (built.isPreorder !== !!order.isPreorder) {
+          return res.status(409).json({
+            message:
+              "Pre-order and in-stock jerseys must be in separate orders",
+          });
+        }
+        order.items.push(built.item);
+      }
+    }
+
     if (deliveryCharge !== undefined) {
       const d = Number(deliveryCharge);
       if (!Number.isFinite(d) || d < 0 || d > 1000) {
@@ -461,6 +564,74 @@ exports.updateOrder = async (req, res) => {
   } catch (err) {
     console.error("Update Order Error:", err);
     res.status(500).json({ message: "Failed to update order" });
+  }
+};
+
+// ✅ Admin: move every jersey of another order (same phone) into this one,
+// then cancel the other order. For "the customer ordered twice by mistake".
+// Body: { fromId }
+exports.mergeOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { fromId } = req.body || {};
+
+    if (
+      !mongoose.isValidObjectId(id) ||
+      !mongoose.isValidObjectId(fromId) ||
+      String(fromId) === String(id)
+    ) {
+      return res.status(400).json({ message: "Invalid order" });
+    }
+
+    const [target, source] = await Promise.all([
+      Order.findById(id),
+      Order.findById(fromId),
+    ]);
+    if (!target || !source) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    const EDITABLE = ["Pending", "Confirmed", "Collecting"];
+    if (!EDITABLE.includes(target.status) || !EDITABLE.includes(source.status)) {
+      return res.status(409).json({
+        message: "Only Pending, Confirmed or Collecting orders can be merged",
+      });
+    }
+    if (target.phone !== source.phone) {
+      return res
+        .status(400)
+        .json({ message: "Both orders must have the same phone number" });
+    }
+    if (!!target.isPreorder !== !!source.isPreorder) {
+      return res.status(409).json({
+        message: "A pre-order cannot be merged with an in-stock order",
+      });
+    }
+    if ((source.advancePaid || 0) > 0) {
+      return res.status(409).json({
+        message: `That order has an advance of ৳${source.advancePaid}. Move the advance first, then merge.`,
+      });
+    }
+
+    for (const it of source.items) target.items.push(it.toObject());
+
+    if (target.originalTotal == null) target.originalTotal = target.totalPrice;
+    target.totalPrice =
+      target.items.reduce((sum, it) => sum + it.price * it.quantity, 0) +
+      target.deliveryCharge;
+    target.edited = true;
+    await target.save();
+
+    source.status = "Cancelled";
+    await source.save();
+
+    invalidateCache("orders:");
+    invalidateCache(`track:${target.phone}`);
+
+    res.json({ order: target, cancelled: source });
+  } catch (err) {
+    console.error("Merge Order Error:", err);
+    res.status(500).json({ message: "Failed to merge orders" });
   }
 };
 

@@ -27,7 +27,12 @@ import {
   shortId,
 } from "./lib";
 import { RiskPanel } from "./RiskParts";
+import AddJerseyPanel from "./AddJerseyPanel";
+import type { AddedItem } from "./AddJerseyPanel";
 import type { AdvancePayload, EditPayload, Order, OrderItem, OrderStatus } from "./lib";
+
+// orders in these statuses can still be edited / merged
+const EDITABLE = ["Pending", "Confirmed", "Collecting"];
 
 const SIZE_OPTIONS = ["S", "M", "L", "XL", "2XL", "3XL", "4XL"];
 
@@ -88,25 +93,32 @@ const inputCls =
 
 export function OrderModal({
   selected,
+  orders,
   updatingId,
   onClose,
   onChangeStatus,
   onCopyNote,
   onSaveEdit,
   onSaveAdvance,
+  onMerge,
   onRiskChecked,
 }: {
   selected: Order;
+  orders: Order[]; // all loaded orders (to find the same customer's other orders)
   updatingId: string | null;
   onClose: () => void;
   onChangeStatus: (order: Order, status: OrderStatus) => void;
   onCopyNote: (order: Order) => void;
   onSaveEdit: (order: Order, payload: EditPayload) => Promise<void>;
   onSaveAdvance: (order: Order, payload: AdvancePayload) => Promise<void>;
+  onMerge: (target: Order, from: Order) => Promise<void>;
   onRiskChecked: (updated: Order) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Draft[]>([]);
+  const [added, setAdded] = useState<AddedItem[]>([]); // new jerseys, saved with "Save changes"
+  const [mergingId, setMergingId] = useState<string | null>(null);
+  const [mergeErr, setMergeErr] = useState("");
   const [delivery, setDelivery] = useState("");
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
@@ -137,7 +149,38 @@ export function OrderModal({
     }
   };
 
-  const canEdit = ["Pending", "Confirmed", "Collecting"].includes(selected.status);
+  const canEdit = EDITABLE.includes(selected.status);
+
+  // other orders of the same customer that can be moved into this one
+  const mergeable = canEdit
+    ? orders.filter(
+        (o) =>
+          o._id !== selected._id &&
+          o.phone === selected.phone &&
+          EDITABLE.includes(o.status) &&
+          !!o.isPreorder === !!selected.isPreorder &&
+          (o.advancePaid ?? 0) === 0,
+      )
+    : [];
+
+  const merge = async (from: Order) => {
+    if (
+      !window.confirm(
+        `Move all jerseys of order #${shortId(from)} into #${shortId(selected)} and cancel #${shortId(from)}?`,
+      )
+    ) {
+      return;
+    }
+    setMergeErr("");
+    setMergingId(from._id);
+    try {
+      await onMerge(selected, from);
+    } catch (e) {
+      setMergeErr(e instanceof Error ? e.message : "Could not merge");
+    } finally {
+      setMergingId(null);
+    }
+  };
 
   const startEdit = () => {
     setDraft(
@@ -149,6 +192,7 @@ export function OrderModal({
       })),
     );
     setDelivery(String(selected.deliveryCharge));
+    setAdded([]);
     setErr("");
     setEditing(true);
   };
@@ -174,7 +218,7 @@ export function OrderModal({
     ? draft.reduce(
         (s, d) => s + (Number(d.price) || 0) * (Number(d.quantity) || 0),
         0,
-      )
+      ) + added.reduce((s, a) => s + a.unit * a.input.quantity, 0)
     : selected.totalPrice - selected.deliveryCharge;
   const previewDelivery = editing
     ? Number(delivery) || 0
@@ -206,7 +250,12 @@ export function OrderModal({
 
     setSaving(true);
     try {
-      await onSaveEdit(selected, { items, deliveryCharge: d });
+      await onSaveEdit(selected, {
+        items,
+        deliveryCharge: d,
+        ...(added.length > 0 && { addItems: added.map((a) => a.input) }),
+      });
+      setAdded([]);
       setEditing(false);
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Could not save");
@@ -428,6 +477,55 @@ export function OrderModal({
           })}
         </div>
 
+        {/* New jerseys (editing only) */}
+        {editing && (
+          <div className="mt-3 space-y-3">
+            {added.map((a, i) => (
+              <div key={i} className="flex gap-3 rounded-xl bg-primary/5 p-2">
+                <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-border/60 bg-secondary">
+                  {a.image ? (
+                    <img src={a.image} alt={a.name} className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                      <ShoppingBag className="h-5 w-5 opacity-40" />
+                    </div>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1 space-y-1">
+                  <div className="flex flex-wrap items-center gap-1.5 text-sm">
+                    <span className="font-medium">{a.name}</span>
+                    <Chip accent>New</Chip>
+                    {a.size && <Chip>Size {a.size}</Chip>}
+                    <Chip>× {a.input.quantity}</Chip>
+                    {a.input.uclPatch && <Chip accent>UCL patch</Chip>}
+                    {(a.input.customName || a.input.customNumber) && (
+                      <Chip accent>
+                        Print: {[a.input.customName, a.input.customNumber].filter(Boolean).join(" ")}
+                      </Chip>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">{money(a.unit)} each</p>
+                </div>
+                <div className="flex shrink-0 flex-col items-end justify-between">
+                  <p className="text-sm font-semibold">{money(a.unit * a.input.quantity)}</p>
+                  <button
+                    type="button"
+                    onClick={() => setAdded((prev) => prev.filter((_, idx) => idx !== i))}
+                    className="text-xs font-semibold text-red-600 hover:underline"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            <AddJerseyPanel
+              isPreorder={!!selected.isPreorder}
+              onAdd={(item) => setAdded((prev) => [...prev, item])}
+            />
+          </div>
+        )}
+
         {/* Summary */}
         <div className="mt-4 space-y-1 border-t border-border/60 pt-4 text-sm">
           <div className="flex justify-between">
@@ -478,6 +576,45 @@ export function OrderModal({
             </>
           )}
         </div>
+
+        {/* Same customer ordered twice: move the other order into this one */}
+        {!editing && mergeable.length > 0 && (
+          <div className="mt-4 space-y-2 rounded-xl border border-amber-500/40 bg-amber-500/5 p-3">
+            <p className="text-sm font-semibold">
+              Same customer has {mergeable.length} other open order
+              {mergeable.length > 1 ? "s" : ""}
+            </p>
+            {mergeable.map((o) => (
+              <div
+                key={o._id}
+                className="flex items-center justify-between gap-3 rounded-lg bg-background p-2 text-sm"
+              >
+                <div className="min-w-0">
+                  <p className="font-medium">
+                    #{shortId(o)} · {o.status} · {money(o.totalPrice)}
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {o.items.map((it) => `${it.name}${itemSize(o, it) ? ` (${itemSize(o, it)})` : ""} ×${it.quantity}`).join(", ")}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled={mergingId !== null}
+                  onClick={() => merge(o)}
+                  className="flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-amber-500 px-3 text-xs font-semibold text-white hover:bg-amber-600 disabled:opacity-60"
+                >
+                  {mergingId === o._id && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  Move here &amp; cancel it
+                </button>
+              </div>
+            ))}
+            {mergeErr && (
+              <p role="alert" className="rounded-lg bg-red-500/10 p-2 text-xs text-red-600">
+                {mergeErr}
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Record advance payment */}
         {!editing && (
@@ -555,7 +692,10 @@ export function OrderModal({
             <div className="flex justify-end gap-3">
               <button
                 type="button"
-                onClick={() => setEditing(false)}
+                onClick={() => {
+                  setAdded([]);
+                  setEditing(false);
+                }}
                 disabled={saving}
                 className="h-10 rounded-xl border border-border px-4 text-sm font-semibold hover:bg-secondary"
               >

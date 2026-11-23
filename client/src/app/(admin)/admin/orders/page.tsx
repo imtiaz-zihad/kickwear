@@ -13,7 +13,7 @@ import {
   money,
   shortId,
 } from "./lib";
-import type { AdvancePayload, EditPayload, Order, OrderStatus } from "./lib";
+import type { AdvancePayload, EditPayload, MergeResult, Order, OrderStatus } from "./lib";
 import { Chip, ItemLine, OrderModal, productionNote } from "./OrderParts";
 import NewOrderModal from "./NewOrderModal";
 import { RiskChip } from "./RiskParts";
@@ -102,6 +102,21 @@ export default function OrdersPage() {
     setOrders((prev) => prev.map((o) => (o._id === updated._id ? updated : o)));
     setSelected((s) => (s && s._id === updated._id ? updated : s));
     flash(`Order #${shortId(updated)} updated`);
+  };
+
+  // move the jerseys of `from` into `target`; the server cancels `from`
+  const mergeOrders = async (target: Order, from: Order) => {
+    const res = await api<MergeResult>(`/orders/${target._id}/merge`, {
+      method: "POST",
+      body: JSON.stringify({ fromId: from._id }),
+    });
+    setOrders((prev) =>
+      prev.map((o) =>
+        o._id === res.order._id ? res.order : o._id === res.cancelled._id ? res.cancelled : o,
+      ),
+    );
+    setSelected((s) => (s && s._id === res.order._id ? res.order : s));
+    flash(`#${shortId(from)} moved into #${shortId(target)} and cancelled`);
   };
 
   const saveAdvance = async (order: Order, payload: AdvancePayload) => {
@@ -344,12 +359,14 @@ export default function OrdersPage() {
       {selected && (
         <OrderModal
           selected={selected}
+          orders={orders}
           updatingId={updatingId}
           onClose={() => setSelected(null)}
           onChangeStatus={changeStatus}
           onCopyNote={copyNote}
           onSaveEdit={saveEdit}
           onSaveAdvance={saveAdvance}
+          onMerge={mergeOrders}
           onRiskChecked={applyUpdated}
         />
       )}

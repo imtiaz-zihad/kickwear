@@ -90,11 +90,25 @@ export type Order = {
   createdAt: string;
 };
 
+// a jersey the admin adds to an existing order (the server sets the prices)
+export type NewItemInput = {
+  productId: string;
+  quantity: number;
+  size: string | null;
+  uclPatch: boolean;
+  customName: string | null;
+  customNumber: string | null;
+};
+
 // what the admin can change on an existing order
 export type EditPayload = {
   items?: { size?: string | null; quantity?: number; price?: number }[];
   deliveryCharge?: number;
+  addItems?: NewItemInput[]; // new jerseys (appended after the existing ones)
 };
+
+// answer of POST /orders/:id/merge
+export type MergeResult = { order: Order; cancelled: Order };
 
 // what the admin sends to record an advance payment
 export type AdvancePayload = { amount: number; method: string; trxId: string };
