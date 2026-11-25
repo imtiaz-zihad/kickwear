@@ -7,7 +7,11 @@ const mongoose = require("mongoose");
 const { sendPurchase } = require("../services/metaCapi");
 const { sizeExtra: extraForSize } = require("../utils/sizes");
 const { notifyNewOrder } = require("../services/notify");
-const { checkCustomer, inspectCustomer, isConfigured } = require("../services/steadfast");
+const {
+  checkCustomer,
+  inspectCustomer,
+  isConfigured,
+} = require("../services/steadfast");
 
 const CACHE_TTL = {
   ORDER_LIST: 100,
@@ -389,7 +393,10 @@ async function buildItem(input) {
   const printing = product.addOns?.customPrint;
 
   if (uclPatch && !patch?.enabled) {
-    return { status: 400, error: `UCL patch is unavailable for ${product.name}` };
+    return {
+      status: 400,
+      error: `UCL patch is unavailable for ${product.name}`,
+    };
   }
 
   const hasName = typeof customName === "string" && customName.trim() !== "";
@@ -398,7 +405,10 @@ async function buildItem(input) {
     customNumber !== undefined &&
     String(customNumber).trim() !== "";
   if (hasName !== hasNumber) {
-    return { status: 400, error: "Custom name and number must be provided together" };
+    return {
+      status: 400,
+      error: "Custom name and number must be provided together",
+    };
   }
   const wantsPrinting = hasName && hasNumber;
   if (wantsPrinting && !printing?.enabled) {
@@ -410,7 +420,8 @@ async function buildItem(input) {
 
   const basePrice = product.discountedPrice;
   const sizeExtra = extraForSize(size);
-  const addOnsPrice = (uclPatch ? patch.price : 0) + (wantsPrinting ? printing.price : 0);
+  const addOnsPrice =
+    (uclPatch ? patch.price : 0) + (wantsPrinting ? printing.price : 0);
 
   return {
     isPreorder,
@@ -454,7 +465,9 @@ exports.updateOrder = async (req, res) => {
 
     if (items !== undefined) {
       if (!Array.isArray(items) || items.length !== order.items.length) {
-        return res.status(400).json({ message: "Items do not match this order" });
+        return res
+          .status(400)
+          .json({ message: "Items do not match this order" });
       }
 
       for (let i = 0; i < items.length; i++) {
@@ -468,7 +481,9 @@ exports.updateOrder = async (req, res) => {
               : null;
           if (size) {
             const product = mongoose.isValidObjectId(item.productId)
-              ? await Product.findById(item.productId).select("sizes name").lean()
+              ? await Product.findById(item.productId)
+                  .select("sizes name")
+                  .lean()
               : null;
             if (product?.sizes?.length && !product.sizes.includes(size)) {
               return res.status(400).json({
@@ -511,10 +526,34 @@ exports.updateOrder = async (req, res) => {
         }
       }
     }
-
+    // drop jerseys the admin removed (items[i].remove === true)
+    if (items !== undefined) {
+      const drop = new Set();
+      items.forEach((p, i) => {
+        if (p && p.remove === true) drop.add(i);
+      });
+      if (drop.size > 0) {
+        const adding = Array.isArray(addItems) ? addItems.length : 0;
+        if (order.items.length - drop.size + adding < 1) {
+          return res
+            .status(400)
+            .json({
+              message:
+                "An order needs at least one jersey. Cancel the order instead.",
+            });
+        }
+        for (let i = order.items.length - 1; i >= 0; i--) {
+          if (drop.has(i)) order.items.splice(i, 1);
+        }
+      }
+    }
     // add more jerseys to this order (same prices + checks as a new order)
     if (addItems !== undefined) {
-      if (!Array.isArray(addItems) || addItems.length === 0 || addItems.length > 10) {
+      if (
+        !Array.isArray(addItems) ||
+        addItems.length === 0 ||
+        addItems.length > 10
+      ) {
         return res.status(400).json({ message: "Invalid jerseys to add" });
       }
       for (const input of addItems) {
@@ -543,7 +582,10 @@ exports.updateOrder = async (req, res) => {
     // remember the original total once, for discount tracking
     if (order.originalTotal == null) order.originalTotal = order.totalPrice;
 
-    const itemsTotal = order.items.reduce((s, it) => s + it.price * it.quantity, 0);
+    const itemsTotal = order.items.reduce(
+      (s, it) => s + it.price * it.quantity,
+      0,
+    );
     order.totalPrice = itemsTotal + order.deliveryCharge;
 
     // the customer already paid part of it: the total cannot drop below that
@@ -592,7 +634,10 @@ exports.mergeOrder = async (req, res) => {
     }
 
     const EDITABLE = ["Pending", "Confirmed", "Collecting"];
-    if (!EDITABLE.includes(target.status) || !EDITABLE.includes(source.status)) {
+    if (
+      !EDITABLE.includes(target.status) ||
+      !EDITABLE.includes(source.status)
+    ) {
       return res.status(409).json({
         message: "Only Pending, Confirmed or Collecting orders can be merged",
       });
@@ -664,7 +709,11 @@ exports.updateAdvance = async (req, res) => {
     // clearing the amount clears the details too
     order.advanceMethod = amount > 0 ? method : "";
     order.advanceTrxId =
-      amount > 0 ? String(req.body?.trxId || "").trim().slice(0, 40) : "";
+      amount > 0
+        ? String(req.body?.trxId || "")
+            .trim()
+            .slice(0, 40)
+        : "";
 
     await order.save();
 
@@ -686,7 +735,9 @@ exports.refreshRisk = async (req, res) => {
       return res.status(400).json({ message: "Invalid order id" });
     }
     if (!isConfigured()) {
-      return res.status(503).json({ message: "Steadfast keys are not set on the server" });
+      return res
+        .status(503)
+        .json({ message: "Steadfast keys are not set on the server" });
     }
 
     const order = await Order.findById(id).select("phone").lean();
@@ -696,7 +747,9 @@ exports.refreshRisk = async (req, res) => {
     if (!risk) {
       return res
         .status(502)
-        .json({ message: "Steadfast check failed. Try again in a few minutes." });
+        .json({
+          message: "Steadfast check failed. Try again in a few minutes.",
+        });
     }
 
     const updated = await Order.findByIdAndUpdate(
