@@ -11,6 +11,7 @@ import {
   PhoneMissed,
   ShoppingCart,
   Store,
+  Wallet,
   X,
 } from "lucide-react";
 import { api } from "./orders/lib";
@@ -23,6 +24,7 @@ const MENU = [
   { name: "Orders", path: "/admin/orders", icon: ShoppingCart },
   { name: "Abandoned", path: "/admin/abandoned", icon: PhoneMissed },
   { name: "Live", path: "/admin/live", icon: Activity },
+  { name: "Accounts", path: "/admin/accounts", icon: Wallet },
 ];
 
 const SEEN_KEY = "kw_orders_seen_at"; // newest order the admin has seen (badge)
@@ -34,7 +36,8 @@ function beep() {
   try {
     const Ctx =
       window.AudioContext ||
-      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      (window as unknown as { webkitAudioContext?: typeof AudioContext })
+        .webkitAudioContext;
     if (!Ctx) return;
     const ctx = new Ctx();
     const osc = ctx.createOscillator();
@@ -52,7 +55,11 @@ function beep() {
   }
 }
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+export default function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const path = usePathname();
   const router = useRouter();
   const [authorized, setAuthorized] = useState(false);
@@ -160,7 +167,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   // browser tab title: "(2) New order"
   useEffect(() => {
     if (!baseTitle.current) baseTitle.current = document.title;
-    document.title = newCount > 0 ? `(${newCount}) New order!` : baseTitle.current;
+    document.title =
+      newCount > 0 ? `(${newCount}) New order!` : baseTitle.current;
   }, [newCount]);
 
   // the toast hides itself
@@ -187,7 +195,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <div className="mb-3 flex items-center justify-between md:mb-9 md:block md:pl-1">
             <div>
               <span className="font-display text-lg font-bold">Kick </span>
-              <span className="font-display text-lg font-bold text-primary">Wear</span>
+              <span className="font-display text-lg font-bold text-primary">
+                Wear
+              </span>
               <div className="mt-1.5 hidden h-0.5 w-8 rounded bg-linear-to-r from-primary to-transparent md:block" />
             </div>
 
@@ -215,7 +225,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </p>
 
           {/* Mobile: 5 equal columns, icon over label. Desktop: vertical list */}
-          <nav className="grid grid-cols-5 gap-1 md:flex md:flex-col">
+          <nav className="grid grid-cols-6 gap-1 md:flex md:flex-col">
             {MENU.map(({ name, path: href, icon: Icon }) => {
               const active = path.startsWith(href);
               const badge = href === "/admin/orders" ? newCount : 0;
@@ -223,7 +233,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <Link
                   key={href}
                   href={href}
-                  className={`relative flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-[11px] font-medium transition-colors md:flex-row md:justify-start md:gap-3 md:px-3 md:py-2.5 md:text-sm ${
+                  className={`relative flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-0.5 py-2 text-[10px] font-medium transition-colors md:flex-row md:justify-start md:gap-3 md:px-3 md:py-2.5 md:text-sm ${
                     active
                       ? "bg-primary text-primary-foreground shadow-lg shadow-primary/30"
                       : "text-white/45 hover:bg-white/5 hover:text-white/80"
