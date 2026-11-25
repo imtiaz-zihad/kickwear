@@ -10,6 +10,8 @@ import {
   Phone,
   MessageCircle,
   ShoppingBag,
+  Trash2,
+  Undo2,
   X,
 } from "lucide-react";
 import {
@@ -86,7 +88,13 @@ export function productionNote(order: Order): string {
 }
 
 // extra = the 3XL/4XL surcharge already inside `price`
-type Draft = { size: string; quantity: string; price: string; extra: number };
+type Draft = {
+  size: string;
+  quantity: string;
+  price: string;
+  extra: number;
+  removed: boolean;
+};
 
 const inputCls =
   "h-9 w-full rounded-lg border border-border bg-background px-2 text-sm outline-none focus:ring-2 focus:ring-primary";
@@ -189,6 +197,7 @@ export function OrderModal({
         quantity: String(it.quantity),
         price: String(it.price),
         extra: it.sizeExtra ?? 0,
+        removed: false,
       })),
     );
     setDelivery(String(selected.deliveryCharge));
@@ -200,6 +209,11 @@ export function OrderModal({
   const setField = (i: number, key: keyof Draft, value: string) =>
     setDraft((prev) =>
       prev.map((d, idx) => (idx === i ? { ...d, [key]: value } : d)),
+    );
+
+  const toggleRemove = (i: number) =>
+    setDraft((prev) =>
+      prev.map((d, idx) => (idx === i ? { ...d, removed: !d.removed } : d)),
     );
 
   // changing the size to / from 3XL or 4XL also moves the unit price
@@ -216,7 +230,8 @@ export function OrderModal({
   // live totals while editing
   const previewSubtotal = editing
     ? draft.reduce(
-        (s, d) => s + (Number(d.price) || 0) * (Number(d.quantity) || 0),
+        (s, d) =>
+          d.removed ? s : s + (Number(d.price) || 0) * (Number(d.quantity) || 0),
         0,
       ) + added.reduce((s, a) => s + a.unit * a.input.quantity, 0)
     : selected.totalPrice - selected.deliveryCharge;
@@ -227,21 +242,29 @@ export function OrderModal({
   const save = async () => {
     setErr("");
 
+    if (draft.every((d) => d.removed) && added.length === 0) {
+      return setErr(
+        "An order needs at least one jersey. Add one, or cancel the order.",
+      );
+    }
+
     const items = draft.map((d) => ({
       size: d.size || null,
       quantity: Number(d.quantity),
       price: Number(d.price),
+      ...(d.removed && { remove: true }),
     }));
+    const kept = items.filter((i) => !i.remove);
 
     if (
-      items.some(
+      kept.some(
         (i) =>
           !Number.isInteger(i.quantity) || i.quantity < 1 || i.quantity > 20,
       )
     ) {
       return setErr("Quantity must be 1–20");
     }
-    if (items.some((i) => !Number.isFinite(i.price) || i.price < 0)) {
+    if (kept.some((i) => !Number.isFinite(i.price) || i.price < 0)) {
       return setErr("Enter a valid price");
     }
     const d = Number(delivery);
@@ -394,7 +417,10 @@ export function OrderModal({
           {selected.items.map((item, i) => {
             const addOns = item.addOnsPrice ?? 0;
             return (
-              <div key={i} className="flex gap-3">
+              <div
+                key={i}
+                className={`flex gap-3 ${editing && draft[i]?.removed ? "opacity-50" : ""}`}
+              >
                 <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-border/60 bg-secondary">
                   {item.image ? (
                     <img
@@ -412,7 +438,11 @@ export function OrderModal({
                 <div className="min-w-0 flex-1 space-y-1">
                   <ItemLine order={selected} item={item} />
 
-                  {editing && draft[i] ? (
+                  {editing && draft[i]?.removed ? (
+                    <p className="pt-1 text-xs font-semibold text-red-600">
+                      Will be removed when you save
+                    </p>
+                  ) : editing && draft[i] ? (
                     <div className="grid grid-cols-3 gap-2 pt-1">
                       <label className="text-xs text-muted-foreground">
                         Size
@@ -471,6 +501,25 @@ export function OrderModal({
                   <p className="shrink-0 text-sm font-semibold">
                     {money(item.price * item.quantity)}
                   </p>
+                )}
+                {editing && draft[i] && (
+                  <button
+                    type="button"
+                    onClick={() => toggleRemove(i)}
+                    aria-label={draft[i].removed ? "Undo remove" : "Remove jersey"}
+                    title={draft[i].removed ? "Undo" : "Remove jersey"}
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
+                      draft[i].removed
+                        ? "text-primary hover:bg-secondary"
+                        : "text-red-600 hover:bg-red-500/10"
+                    }`}
+                  >
+                    {draft[i].removed ? (
+                      <Undo2 className="h-4 w-4" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                  </button>
                 )}
               </div>
             );

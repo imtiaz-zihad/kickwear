@@ -102,7 +102,12 @@ export type NewItemInput = {
 
 // what the admin can change on an existing order
 export type EditPayload = {
-  items?: { size?: string | null; quantity?: number; price?: number }[];
+  items?: {
+    size?: string | null;
+    quantity?: number;
+    price?: number;
+    remove?: boolean; // drop this jersey from the order
+  }[];
   deliveryCharge?: number;
   addItems?: NewItemInput[]; // new jerseys (appended after the existing ones)
 };
