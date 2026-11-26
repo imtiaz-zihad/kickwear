@@ -3,6 +3,7 @@ const router = require("express").Router();
 const {
   createOrder,
   getOrders,
+  customerHistory,
   updateStatus,
   updateOrder,
   mergeOrder,

@@ -310,6 +310,38 @@ exports.trackOrder = async (req, res) => {
   }
 };
 
+// ✅ Admin: how many orders this phone placed before, by outcome.
+// GET /orders/history/:phone?exclude=<orderId>
+exports.customerHistory = async (req, res) => {
+  try {
+    const { phone } = req.params;
+    if (!/^01[3-9]\d{8}$/.test(phone)) {
+      return res.status(400).json({ message: "Invalid phone number" });
+    }
+
+    const match = { phone };
+    const { exclude } = req.query;
+    if (exclude && mongoose.isValidObjectId(String(exclude))) {
+      match._id = { $ne: new mongoose.Types.ObjectId(String(exclude)) };
+    }
+
+    const rows = await Order.aggregate([
+      { $match: match },
+      { $group: { _id: "$status", count: { $sum: 1 } } },
+    ]);
+
+    const by = Object.fromEntries(rows.map((r) => [r._id, r.count]));
+    const delivered = by.Delivered || 0;
+    const cancelled = by.Cancelled || 0;
+    const total = rows.reduce((s, r) => s + r.count, 0);
+
+    res.json({ total, delivered, cancelled, open: total - delivered - cancelled });
+  } catch (err) {
+    console.error("Customer History Error:", err);
+    res.status(500).json({ message: "Failed to load customer history" });
+  }
+};
+
 // ✅ Get all orders (admin)
 // Query: page, limit, status, preorder=true|false
 exports.getOrders = async (req, res) => {

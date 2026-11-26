@@ -237,7 +237,6 @@ export default function OrderButton({
   const deliveryCharge = DELIVERY[form.deliveryArea].charge;
   const total = subtotal + deliveryCharge;
 
-  // kids products (sizes 16-28) get their own chart
   const isKids = isKidsSizes(sizes);
   const kidsRow = isKids ? KIDS_SIZE_CHART.find((r) => r.size === size) : undefined;
   const chartRow = isKids ? undefined : SIZE_CHART.find((r) => r.size === size);
@@ -653,6 +652,13 @@ export default function OrderButton({
                     </p>
                   )}
                 </div>
+              )}
+
+              {printActive && (
+                <p className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm font-medium text-amber-900">
+                  Name &amp; Number print needs a 40% advance payment. We will
+                  contact you after you place the order.
+                </p>
               )}
             </div>
           )}
