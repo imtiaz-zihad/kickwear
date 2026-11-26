@@ -32,13 +32,7 @@ import {
 import { RiskPanel } from "./RiskParts";
 import AddJerseyPanel from "./AddJerseyPanel";
 import type { AddedItem } from "./AddJerseyPanel";
-import type {
-  AdvancePayload,
-  EditPayload,
-  Order,
-  OrderItem,
-  OrderStatus,
-} from "./lib";
+import type { AdvancePayload, EditPayload, Order, OrderItem, OrderStatus } from "./lib";
 
 // orders in these statuses can still be edited / merged
 const EDITABLE = ["Pending", "Confirmed", "Collecting"];
@@ -177,21 +171,23 @@ export function OrderModal({
   const [delivery, setDelivery] = useState("");
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
+
   // earlier orders of this phone (kept with its phone so it never shows stale data)
-  const [hist, setHist] = useState<{ phone: string; data: History } | null>(
-    null,
-  );
+  const [hist, setHist] = useState<{ phone: string; data: History } | null>(null);
   const history = hist && hist.phone === selected.phone ? hist.data : null;
 
   useEffect(() => {
     let live = true;
-    api<History>(`/orders/history/${selected.phone}?exclude=${selected._id}`)
+    api<History>(
+      `/orders/history/${selected.phone}?exclude=${selected._id}`,
+    )
       .then((data) => live && setHist({ phone: selected.phone, data }))
       .catch(() => {});
     return () => {
       live = false;
     };
   }, [selected.phone, selected._id]);
+
   // advance payment box
   const [advAmount, setAdvAmount] = useState(String(selected.advancePaid ?? 0));
   const [advMethod, setAdvMethod] = useState(selected.advanceMethod ?? "");
@@ -205,22 +201,12 @@ export function OrderModal({
   const saveAdvance = async () => {
     setAdvErr("");
     const amount = Math.round(Number(advAmount));
-    if (
-      !Number.isFinite(amount) ||
-      amount < 0 ||
-      amount > selected.totalPrice
-    ) {
-      return setAdvErr(
-        `Enter an amount from ৳0 to ${money(selected.totalPrice)}`,
-      );
+    if (!Number.isFinite(amount) || amount < 0 || amount > selected.totalPrice) {
+      return setAdvErr(`Enter an amount from ৳0 to ${money(selected.totalPrice)}`);
     }
     setAdvSaving(true);
     try {
-      await onSaveAdvance(selected, {
-        amount,
-        method: advMethod,
-        trxId: advTrx.trim(),
-      });
+      await onSaveAdvance(selected, { amount, method: advMethod, trxId: advTrx.trim() });
     } catch (e) {
       setAdvErr(e instanceof Error ? e.message : "Could not save");
     } finally {
@@ -302,9 +288,7 @@ export function OrderModal({
   const previewSubtotal = editing
     ? draft.reduce(
         (s, d) =>
-          d.removed
-            ? s
-            : s + (Number(d.price) || 0) * (Number(d.quantity) || 0),
+          d.removed ? s : s + (Number(d.price) || 0) * (Number(d.quantity) || 0),
         0,
       ) + added.reduce((s, a) => s + a.unit * a.input.quantity, 0)
     : selected.totalPrice - selected.deliveryCharge;
@@ -395,7 +379,7 @@ export function OrderModal({
             Pre-order · {selected.preorderNote}
           </p>
         )}
-
+        
         {/* Customer */}
         <div className="mb-5 grid grid-cols-2 gap-3 text-sm">
           <div className="rounded-xl bg-secondary/60 p-3">
@@ -580,9 +564,7 @@ export function OrderModal({
                   <button
                     type="button"
                     onClick={() => toggleRemove(i)}
-                    aria-label={
-                      draft[i].removed ? "Undo remove" : "Remove jersey"
-                    }
+                    aria-label={draft[i].removed ? "Undo remove" : "Remove jersey"}
                     title={draft[i].removed ? "Undo" : "Remove jersey"}
                     className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
                       draft[i].removed
@@ -609,11 +591,7 @@ export function OrderModal({
               <div key={i} className="flex gap-3 rounded-xl bg-primary/5 p-2">
                 <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-border/60 bg-secondary">
                   {a.image ? (
-                    <img
-                      src={a.image}
-                      alt={a.name}
-                      className="h-full w-full object-cover"
-                    />
+                    <img src={a.image} alt={a.name} className="h-full w-full object-cover" />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-muted-foreground">
                       <ShoppingBag className="h-5 w-5 opacity-40" />
@@ -629,26 +607,17 @@ export function OrderModal({
                     {a.input.uclPatch && <Chip accent>UCL patch</Chip>}
                     {(a.input.customName || a.input.customNumber) && (
                       <Chip accent>
-                        Print:{" "}
-                        {[a.input.customName, a.input.customNumber]
-                          .filter(Boolean)
-                          .join(" ")}
+                        Print: {[a.input.customName, a.input.customNumber].filter(Boolean).join(" ")}
                       </Chip>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {money(a.unit)} each
-                  </p>
+                  <p className="text-xs text-muted-foreground">{money(a.unit)} each</p>
                 </div>
                 <div className="flex shrink-0 flex-col items-end justify-between">
-                  <p className="text-sm font-semibold">
-                    {money(a.unit * a.input.quantity)}
-                  </p>
+                  <p className="text-sm font-semibold">{money(a.unit * a.input.quantity)}</p>
                   <button
                     type="button"
-                    onClick={() =>
-                      setAdded((prev) => prev.filter((_, idx) => idx !== i))
-                    }
+                    onClick={() => setAdded((prev) => prev.filter((_, idx) => idx !== i))}
                     className="text-xs font-semibold text-red-600 hover:underline"
                   >
                     Remove
@@ -732,12 +701,7 @@ export function OrderModal({
                     #{shortId(o)} · {o.status} · {money(o.totalPrice)}
                   </p>
                   <p className="truncate text-xs text-muted-foreground">
-                    {o.items
-                      .map(
-                        (it) =>
-                          `${it.name}${itemSize(o, it) ? ` (${itemSize(o, it)})` : ""} ×${it.quantity}`,
-                      )
-                      .join(", ")}
+                    {o.items.map((it) => `${it.name}${itemSize(o, it) ? ` (${itemSize(o, it)})` : ""} ×${it.quantity}`).join(", ")}
                   </p>
                 </div>
                 <button
@@ -746,18 +710,13 @@ export function OrderModal({
                   onClick={() => merge(o)}
                   className="flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-amber-500 px-3 text-xs font-semibold text-white hover:bg-amber-600 disabled:opacity-60"
                 >
-                  {mergingId === o._id && (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  )}
+                  {mergingId === o._id && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                   Move here &amp; cancel it
                 </button>
               </div>
             ))}
             {mergeErr && (
-              <p
-                role="alert"
-                className="rounded-lg bg-red-500/10 p-2 text-xs text-red-600"
-              >
+              <p role="alert" className="rounded-lg bg-red-500/10 p-2 text-xs text-red-600">
                 {mergeErr}
               </p>
             )}
@@ -806,10 +765,7 @@ export function OrderModal({
               </label>
             </div>
             {advErr && (
-              <p
-                role="alert"
-                className="rounded-lg bg-red-500/10 p-2 text-xs text-red-600"
-              >
+              <p role="alert" className="rounded-lg bg-red-500/10 p-2 text-xs text-red-600">
                 {advErr}
               </p>
             )}
