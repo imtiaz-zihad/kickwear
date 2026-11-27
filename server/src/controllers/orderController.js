@@ -19,7 +19,10 @@ const CACHE_TTL = {
   ORDER_LIST: 100,
   TRACK_ORDER: 30,
 };
-
+const maskName = (full = "") => {
+  const chars = Array.from(String(full).trim());
+  return chars.length <= 3 ? chars.join("") : `${chars.slice(0, 3).join("")}***`;
+};
 const publicOrder = (o) => ({
   _id: o._id,
   customerName: maskName(o.customerName),
