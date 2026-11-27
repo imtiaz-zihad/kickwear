@@ -2,6 +2,7 @@
 // Partner hisab (Imtiaz / Zihad): add, edit, delete and the balance of each.
 const mongoose = require("mongoose");
 const AccountEntry = require("../models/AccountEntry");
+const { getBalance } = require("../services/steadfast");
 
 const { PARTNERS, TYPES } = AccountEntry;
 
@@ -130,5 +131,14 @@ exports.remove = async (req, res) => {
   } catch (err) {
     console.error("Accounts delete error:", err);
     res.status(500).json({ message: "Failed to delete entry" });
+  }
+};
+
+// GET /api/accounts/courier-balance  -> { balance }  (Steadfast wallet)
+exports.courierBalance = async (req, res) => {
+  try {
+    res.json({ balance: await getBalance() });
+  } catch (err) {
+    res.status(err.status || 502).json({ message: err.message || "Could not load courier balance" });
   }
 };

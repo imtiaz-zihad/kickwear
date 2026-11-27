@@ -216,7 +216,36 @@ async function parcelStatus(consignmentId) {
     throw courierError(err);
   }
 }
+// Money Steadfast is holding for us (current_balance, in taka)
+async function getBalance() {
+  assertReady();
+  try {
+    const res = await axios.get(`${BASE_URL}/get_balance`, {
+      headers: authHeaders(),
+      timeout: 10000,
+    });
+    const n = Number(res.data?.current_balance);
+    if (!Number.isFinite(n)) {
+      const e = new Error("Steadfast answered without a balance.");
+      e.status = 502;
+      throw e;
+    }
+    return n;
+  } catch (err) {
+    if (err.status && !err.response) throw err;
+    throw courierError(err);
+  }
+}
 
+module.exports = {
+  getBalance,
+  checkCustomer,
+  inspectCustomer,
+  isConfigured,
+  normalize,
+  bookParcel,
+  parcelStatus,
+};
 module.exports = {
   checkCustomer,
   inspectCustomer,
