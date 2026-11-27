@@ -11,12 +11,43 @@ const {
   checkCustomer,
   inspectCustomer,
   isConfigured,
+  bookParcel,
+  parcelStatus,
 } = require("../services/steadfast");
 
 const CACHE_TTL = {
   ORDER_LIST: 100,
   TRACK_ORDER: 30,
 };
+
+const publicOrder = (o) => ({
+  _id: o._id,
+  customerName: maskName(o.customerName),
+  deliveryArea: o.deliveryArea,
+  items: (o.items || []).map((i) => ({
+    productId: i.productId,
+    name: i.name,
+    image: i.image,
+    size: i.size,
+    quantity: i.quantity,
+    basePrice: i.basePrice,
+    sizeExtra: i.sizeExtra,
+    uclPatch: i.uclPatch,
+    customName: i.customName,
+    customNumber: i.customNumber,
+    addOnsPrice: i.addOnsPrice,
+    price: i.price,
+  })),
+  size: o.size,
+  totalPrice: o.totalPrice,
+  deliveryCharge: o.deliveryCharge,
+  advancePaid: o.advancePaid,
+  status: o.status,
+  isPreorder: o.isPreorder,
+  preorderNote: o.preorderNote,
+  trackingCode: o.courier?.trackingCode || undefined,
+  createdAt: o.createdAt,
+});
 
 // Looks up the customer on Steadfast and saves the result on the order.
 // Returns the risk, or null if it could not be checked.
@@ -301,12 +332,15 @@ exports.trackOrder = async (req, res) => {
     const cached = getCache(cacheKey);
     if (cached) return res.json(cached);
 
-    const orders = await Order.find({ phone }).sort({ createdAt: -1 }).lean();
+    const orders = (
+      await Order.find({ phone }).sort({ createdAt: -1 }).lean()
+    ).map(publicOrder);
 
     setCache(cacheKey, orders, CACHE_TTL.TRACK_ORDER);
     res.json(orders);
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error("Track Order Error:", err);
+    res.status(500).json({ message: "Could not load your orders" });
   }
 };
 
@@ -335,7 +369,12 @@ exports.customerHistory = async (req, res) => {
     const cancelled = by.Cancelled || 0;
     const total = rows.reduce((s, r) => s + r.count, 0);
 
-    res.json({ total, delivered, cancelled, open: total - delivered - cancelled });
+    res.json({
+      total,
+      delivered,
+      cancelled,
+      open: total - delivered - cancelled,
+    });
   } catch (err) {
     console.error("Customer History Error:", err);
     res.status(500).json({ message: "Failed to load customer history" });
@@ -567,12 +606,10 @@ exports.updateOrder = async (req, res) => {
       if (drop.size > 0) {
         const adding = Array.isArray(addItems) ? addItems.length : 0;
         if (order.items.length - drop.size + adding < 1) {
-          return res
-            .status(400)
-            .json({
-              message:
-                "An order needs at least one jersey. Cancel the order instead.",
-            });
+          return res.status(400).json({
+            message:
+              "An order needs at least one jersey. Cancel the order instead.",
+          });
         }
         for (let i = order.items.length - 1; i >= 0; i--) {
           if (drop.has(i)) order.items.splice(i, 1);
@@ -777,11 +814,9 @@ exports.refreshRisk = async (req, res) => {
 
     const risk = await checkCustomer(order.phone, { force: true });
     if (!risk) {
-      return res
-        .status(502)
-        .json({
-          message: "Steadfast check failed. Try again in a few minutes.",
-        });
+      return res.status(502).json({
+        message: "Steadfast check failed. Try again in a few minutes.",
+      });
     }
 
     const updated = await Order.findByIdAndUpdate(
@@ -793,6 +828,126 @@ exports.refreshRisk = async (req, res) => {
     res.json(updated);
   } catch (err) {
     res.status(500).json({ message: err.message });
+  }
+};
+
+// ✅ Admin: send this order to the courier (Steadfast) and mark it Shipped
+const COURIER_BOOKABLE = ["Confirmed", "Collecting"];
+
+// What the rider / packer should know about the jerseys
+const courierNote = (order) => {
+  const lines = order.items.map((i) =>
+    [
+      i.name,
+      (i.size || order.size) && `Size ${i.size || order.size}`,
+      `x${i.quantity}`,
+      i.uclPatch && "UCL patch",
+      (i.customName || i.customNumber) &&
+        `Print: ${[i.customName, i.customNumber].filter(Boolean).join(" ")}`,
+    ]
+      .filter(Boolean)
+      .join(" | "),
+  );
+  if ((order.advancePaid || 0) > 0) lines.push(`Advance paid: ${order.advancePaid}`);
+  return lines.join("; ").slice(0, 480);
+};
+
+exports.bookCourier = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ message: "Invalid order id" });
+    }
+
+    const order = await Order.findById(id).lean();
+    if (!order) return res.status(404).json({ message: "Order not found" });
+
+    if (order.courier?.consignmentId) {
+      return res.status(409).json({ message: "This order was already sent to the courier" });
+    }
+    if (!COURIER_BOOKABLE.includes(order.status)) {
+      return res.status(400).json({
+        message: `Only Confirmed or Collecting orders can be sent (this one is ${order.status})`,
+      });
+    }
+
+    // customer pays the rest on delivery (advance already received)
+    const cod = Math.max(0, order.totalPrice - (order.advancePaid || 0));
+
+    let parcel;
+    try {
+      parcel = await bookParcel({
+        invoice: String(order._id),
+        name: order.customerName,
+        phone: order.phone,
+        address: order.address,
+        cod,
+        note: courierNote(order),
+      });
+    } catch (err) {
+      return res.status(err.status || 502).json({ message: err.message });
+    }
+
+    try {
+      const updated = await Order.findByIdAndUpdate(
+        id,
+        {
+          $set: {
+            courier: { provider: "steadfast", ...parcel, bookedAt: new Date(), syncedAt: new Date() },
+            status: "Shipped",
+          },
+        },
+        { returnDocument: "after" },
+      ).lean();
+
+      invalidateCache("orders:");
+      invalidateCache(`track:${order.phone}`);
+      res.json(updated);
+    } catch (err) {
+      // the parcel exists at the courier but we could not save it: never lose the id
+      console.error("Courier saved at Steadfast but not in DB:", id, parcel, err);
+      res.status(500).json({
+        message: `Parcel booked (consignment ${parcel.consignmentId}, tracking ${parcel.trackingCode}) but saving failed. Note these down.`,
+      });
+    }
+  } catch (err) {
+    console.error("Book Courier Error:", err);
+    res.status(500).json({ message: "Failed to send the order to the courier" });
+  }
+};
+
+// ✅ Admin: read the courier's current status for one order
+exports.syncCourier = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ message: "Invalid order id" });
+    }
+
+    const order = await Order.findById(id).select("phone courier").lean();
+    if (!order) return res.status(404).json({ message: "Order not found" });
+    if (!order.courier?.consignmentId) {
+      return res.status(400).json({ message: "This order has not been sent to the courier" });
+    }
+
+    let status;
+    try {
+      status = await parcelStatus(order.courier.consignmentId);
+    } catch (err) {
+      return res.status(err.status || 502).json({ message: err.message });
+    }
+
+    const updated = await Order.findByIdAndUpdate(
+      id,
+      { $set: { "courier.status": status, "courier.syncedAt": new Date() } },
+      { returnDocument: "after" },
+    ).lean();
+
+    invalidateCache("orders:");
+    res.json(updated);
+  } catch (err) {
+    console.error("Sync Courier Error:", err);
+    res.status(500).json({ message: "Failed to read the courier status" });
   }
 };
 

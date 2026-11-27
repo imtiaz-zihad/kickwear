@@ -36,12 +36,29 @@ const orderItemSchema = new mongoose.Schema(
 const riskSchema = new mongoose.Schema(
   {
     percent: { type: Number, default: null }, // risk % (null = new customer)
-    level: { type: String, enum: ["new", "low", "medium", "high"], required: true },
+    level: {
+      type: String,
+      enum: ["new", "low", "medium", "high"],
+      required: true,
+    },
     deliveryPercent: { type: Number, default: null },
     cancelPercent: { type: Number, default: null },
     reports: { type: Number, default: 0 }, // reports by other merchants
     volume: { type: String, default: "" },
     checkedAt: { type: Date, default: Date.now },
+  },
+  { _id: false },
+);
+
+// Parcel booked with the courier (Steadfast / Packzy), see services/steadfast.js
+const courierSchema = new mongoose.Schema(
+  {
+    provider: { type: String, default: "steadfast" },
+    consignmentId: { type: String, default: "" },
+    trackingCode: { type: String, default: "" },
+    status: { type: String, default: "" }, // the courier's own status, e.g. "in_review"
+    bookedAt: { type: Date, default: Date.now },
+    syncedAt: { type: Date, default: null },
   },
   { _id: false },
 );
@@ -76,13 +93,20 @@ const orderSchema = new mongoose.Schema(
 
     // advance payment taken before delivery (the rest is Cash on Delivery)
     advancePaid: { type: Number, default: 0, min: 0 },
-    advanceMethod: { type: String, enum: [...ADVANCE_METHODS, ""], default: "" },
+    advanceMethod: {
+      type: String,
+      enum: [...ADVANCE_METHODS, ""],
+      default: "",
+    },
     advanceTrxId: { type: String, trim: true, maxlength: 40, default: "" },
 
     size: { type: String, default: null }, // legacy (old orders)
 
     // Steadfast delivery record of this phone number (filled after the order is placed)
     risk: { type: riskSchema, default: undefined },
+
+    // set once the parcel is sent to the courier
+    courier: { type: courierSchema, default: undefined },
 
     // set when an admin edits the order
     edited: { type: Boolean, default: false },
