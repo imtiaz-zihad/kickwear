@@ -246,11 +246,3 @@ module.exports = {
   bookParcel,
   parcelStatus,
 };
-module.exports = {
-  checkCustomer,
-  inspectCustomer,
-  isConfigured,
-  normalize,
-  bookParcel,
-  parcelStatus,
-};
