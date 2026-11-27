@@ -191,6 +191,7 @@ export default function AccountsPage() {
   const [filter, setFilter] = useState<Partner | "all">("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+    const [courier, setCourier] = useState<{ balance?: number; error?: string }>({});
 
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState<Form>(emptyForm);
@@ -224,6 +225,19 @@ export default function AccountsPage() {
     load();
   }, [load]);
 
+
+  const loadCourier = useCallback(async () => {
+    try {
+      const r = await api<{ balance: number }>("/accounts/courier-balance");
+      setCourier({ balance: r.balance });
+    } catch (e) {
+      setCourier({ error: e instanceof Error ? e.message : "Could not load" });
+    }
+  }, []);
+
+  useEffect(() => {
+    loadCourier();
+  }, [loadCourier]);
   // one partner is owed, the other owes: this payment settles it
   const settle = useMemo(() => {
     const a = summary.imtiaz.balance;
@@ -385,7 +399,34 @@ export default function AccountsPage() {
           {error}
         </p>
       )}
-
+      {/* Steadfast wallet */}
+      <div className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-card px-4 py-3">
+        <div>
+          <p className="text-sm font-semibold text-muted-foreground">
+            Steadfast balance
+          </p>
+          <p className="text-xl font-bold">
+            {courier.balance !== undefined
+              ? money(courier.balance)
+              : courier.error
+                ? "Unavailable"
+                : "Loading…"}
+          </p>
+          {courier.error && (
+            <p className="text-xs text-red-600">{courier.error}</p>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setCourier({});
+            loadCourier();
+          }}
+          className="h-9 rounded-xl border border-border px-3 text-sm font-medium hover:bg-muted"
+        >
+          Refresh
+        </button>
+      </div>
       {/* Balances */}
       <div className="grid gap-4 sm:grid-cols-2">
         {PARTNERS.map((p) => (
