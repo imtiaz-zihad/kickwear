@@ -37,7 +37,12 @@ type Status = Step | "Cancelled";
 
 const STATUS_INFO: Record<
   Status,
-  { icon: typeof Clock; badge: string; message: string; preorderMessage?: string }
+  {
+    icon: typeof Clock;
+    badge: string;
+    message: string;
+    preorderMessage?: string;
+  }
 > = {
   Pending: {
     icon: Clock,
@@ -92,15 +97,16 @@ type Order = {
   _id: string;
   customerName: string;
   phone: string;
-  address: string;
-  size?: string | null; // legacy: old orders kept one size here
   items: OrderItem[];
+  deliveryArea?: "dhaka" | "outside";
+  size?: string | null;
   totalPrice: number;
   deliveryCharge: number;
   advancePaid?: number;
   status: Status;
   isPreorder?: boolean;
   preorderNote?: string;
+  trackingCode?: string; // courier tracking code, once the parcel is sent
   createdAt: string;
 };
 
@@ -160,12 +166,18 @@ function Stepper({ status }: { status: Step }) {
                   : "bg-secondary text-muted-foreground"
               } ${active ? "ring-4 ring-primary/20" : ""}`}
             >
-              {done ? <Check className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
+              {done ? (
+                <Check className="h-4 w-4" />
+              ) : (
+                <Icon className="h-4 w-4" />
+              )}
             </div>
 
             <span
               className={`mt-2 text-xs ${
-                reached ? "font-semibold text-foreground" : "text-muted-foreground"
+                reached
+                  ? "font-semibold text-foreground"
+                  : "text-muted-foreground"
               }`}
             >
               {STEP_LABEL[step] ?? step}
@@ -187,7 +199,9 @@ function OrderCard({ order }: { order: Order }) {
   } #${shortId(order)} (${order.customerName}).`;
 
   const message =
-    order.isPreorder && info.preorderMessage ? info.preorderMessage : info.message;
+    order.isPreorder && info.preorderMessage
+      ? info.preorderMessage
+      : info.message;
 
   return (
     <article className="overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm">
@@ -206,8 +220,18 @@ function OrderCard({ order }: { order: Order }) {
           <h2 className="mt-0.5 text-lg font-semibold">{order.customerName}</h2>
           <p className="mt-1 flex items-start gap-1.5 text-sm text-muted-foreground">
             <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            {order.address}
+            {order.deliveryArea === "outside"
+              ? "Outside Dhaka"
+              : "Inside Dhaka"}
           </p>
+          {order.trackingCode && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Courier tracking code:{" "}
+              <span className="font-semibold text-foreground">
+                {order.trackingCode}
+              </span>
+            </p>
+          )}
           <p className="mt-1 text-xs text-muted-foreground">
             Placed on{" "}
             {new Date(order.createdAt).toLocaleDateString(undefined, {
@@ -218,7 +242,9 @@ function OrderCard({ order }: { order: Order }) {
           </p>
         </div>
 
-        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${info.badge}`}>
+        <span
+          className={`rounded-full px-3 py-1 text-xs font-semibold ${info.badge}`}
+        >
           {STEP_LABEL[order.status] ?? order.status}
         </span>
       </div>
@@ -248,7 +274,11 @@ function OrderCard({ order }: { order: Order }) {
             <div key={i} className="flex gap-3">
               <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-secondary">
                 {item.image ? (
-                  <img src={item.image} alt={item.name} className="h-full w-full object-cover" />
+                  <img
+                    src={item.image}
+                    alt={item.name}
+                    className="h-full w-full object-cover"
+                  />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-muted-foreground">
                     <ShoppingBag className="h-5 w-5 opacity-40" />
@@ -296,7 +326,9 @@ function OrderCard({ order }: { order: Order }) {
             </div>
             <div className="flex justify-between text-base font-bold">
               <span>To pay on delivery</span>
-              <span className="text-primary">{money(Math.max(0, order.totalPrice - advance))}</span>
+              <span className="text-primary">
+                {money(Math.max(0, order.totalPrice - advance))}
+              </span>
             </div>
           </>
         )}
@@ -346,11 +378,15 @@ export default function TrackOrderPage() {
     setSearched(false);
 
     try {
-      const res = await fetch(`${BASE_URL}/orders/track/${phone}`, { cache: "no-store" });
+      const res = await fetch(`${BASE_URL}/orders/track/${phone}`, {
+        cache: "no-store",
+      });
       const data = await res.json().catch(() => null);
 
       if (!res.ok) {
-        throw new Error(data?.message || "Could not load your orders. Please try again.");
+        throw new Error(
+          data?.message || "Could not load your orders. Please try again.",
+        );
       }
 
       setOrders(Array.isArray(data) ? data : []);
@@ -359,7 +395,11 @@ export default function TrackOrderPage() {
     } catch (err) {
       setOrders([]);
       setSearched(false);
-      setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Something went wrong. Please try again.",
+      );
     } finally {
       setLoading(false);
     }
@@ -373,9 +413,12 @@ export default function TrackOrderPage() {
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
             <MapPin className="h-6 w-6 text-primary" />
           </div>
-          <h1 className="font-display text-3xl font-bold md:text-4xl">Track Your Order</h1>
+          <h1 className="font-display text-3xl font-bold md:text-4xl">
+            Track Your Order
+          </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Enter the phone number you used to order and see where your jersey is.
+            Enter the phone number you used to order and see where your jersey
+            is.
           </p>
         </div>
 
@@ -442,11 +485,14 @@ export default function TrackOrderPage() {
         )}
 
         {/* Results */}
-        {!loading && searched &&
+        {!loading &&
+          searched &&
           (orders.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-border bg-card px-6 py-12 text-center">
               <Package className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
-              <p className="font-semibold">No orders found for {searchedPhone}</p>
+              <p className="font-semibold">
+                No orders found for {searchedPhone}
+              </p>
               <p className="mx-auto mt-1 max-w-xs text-sm text-muted-foreground">
                 Check the number and try again, or place a new order.
               </p>
@@ -460,8 +506,11 @@ export default function TrackOrderPage() {
           ) : (
             <div className="space-y-5">
               <p className="text-sm text-muted-foreground">
-                {orders.length} {orders.length === 1 ? "order" : "orders"} found for{" "}
-                <span className="font-semibold text-foreground">{searchedPhone}</span>
+                {orders.length} {orders.length === 1 ? "order" : "orders"} found
+                for{" "}
+                <span className="font-semibold text-foreground">
+                  {searchedPhone}
+                </span>
               </p>
               {orders.map((order) => (
                 <OrderCard key={order._id} order={order} />

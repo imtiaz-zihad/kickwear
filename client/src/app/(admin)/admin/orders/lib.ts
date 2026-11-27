@@ -80,6 +80,14 @@ export type Order = {
   status: OrderStatus;
   source?: OrderSource;
   edited?: boolean;
+  courier?: {
+    provider?: string;
+    consignmentId?: string;
+    trackingCode?: string;
+    status?: string; // the courier's own status, e.g. "in_review"
+    bookedAt: string;
+    syncedAt?: string | null;
+  };
   risk?: Risk;
   isPreorder?: boolean;
   preorderNote?: string;
@@ -164,7 +172,9 @@ export const orderWhatsAppText = (o: Order): string => {
   });
 
   lines.push("");
-  lines.push(`🚚 Delivery (${areaLabel(getArea(o))}): ${money(o.deliveryCharge)}`);
+  lines.push(
+    `🚚 Delivery (${areaLabel(getArea(o))}): ${money(o.deliveryCharge)}`,
+  );
   lines.push(`✅ Total: ${money(o.totalPrice)}`);
   if ((o.advancePaid ?? 0) > 0) {
     lines.push(`💵 Advance paid: ${money(o.advancePaid ?? 0)}`);
@@ -174,10 +184,14 @@ export const orderWhatsAppText = (o: Order): string => {
   }
 
   if (o.address) lines.push("", `📍 ${o.address}`);
-  if (o.isPreorder && o.preorderNote) lines.push("", `⏳ Pre-order: ${o.preorderNote}`);
+  if (o.isPreorder && o.preorderNote)
+    lines.push("", `⏳ Pre-order: ${o.preorderNote}`);
 
   if (o.status === "Pending") {
-    lines.push("", 'আপনার অর্ডারটি কি আমরা কনফার্ম করবো? কনফার্ম করতে "হ্যাঁ" লিখে রিপ্লাই দিন। 🙏');
+    lines.push(
+      "",
+      'আপনার অর্ডারটি কি আমরা কনফার্ম করবো? কনফার্ম করতে "হ্যাঁ" লিখে রিপ্লাই দিন। 🙏',
+    );
   } else {
     lines.push("", `অর্ডারের বর্তমান অবস্থা: ${o.status}`);
   }

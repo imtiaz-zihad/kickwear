@@ -13,7 +13,13 @@ import {
   money,
   shortId,
 } from "./lib";
-import type { AdvancePayload, EditPayload, MergeResult, Order, OrderStatus } from "./lib";
+import type {
+  AdvancePayload,
+  EditPayload,
+  MergeResult,
+  Order,
+  OrderStatus,
+} from "./lib";
 import { Chip, ItemLine, OrderModal, productionNote } from "./OrderParts";
 import NewOrderModal from "./NewOrderModal";
 import { RiskChip } from "./RiskParts";
@@ -28,7 +34,9 @@ export default function OrdersPage() {
   const [selected, setSelected] = useState<Order | null>(null);
   const [newOpen, setNewOpen] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
-  const [toast, setToast] = useState<{ text: string; error?: boolean } | null>(null);
+  const [toast, setToast] = useState<{ text: string; error?: boolean } | null>(
+    null,
+  );
 
   const flash = useCallback((text: string, isError = false) => {
     setToast({ text, error: isError });
@@ -38,10 +46,16 @@ export default function OrdersPage() {
   useEffect(() => {
     let cancelled = false;
     api<{ data?: Order[] } | Order[]>("/orders?limit=200&noCache=true")
-      .then((res) => !cancelled && setOrders(Array.isArray(res) ? res : (res.data ?? [])))
+      .then(
+        (res) =>
+          !cancelled && setOrders(Array.isArray(res) ? res : (res.data ?? [])),
+      )
       .catch(
         (err) =>
-          !cancelled && setError(err instanceof Error ? err.message : "Failed to load orders"),
+          !cancelled &&
+          setError(
+            err instanceof Error ? err.message : "Failed to load orders",
+          ),
       )
       .finally(() => !cancelled && setLoading(false));
     return () => {
@@ -70,10 +84,16 @@ export default function OrdersPage() {
 
   const changeStatus = async (order: Order, status: OrderStatus) => {
     if (status === order.status) return;
-    if (status === "Cancelled" && !window.confirm(`Cancel order #${shortId(order)}?`)) return;
+    if (
+      status === "Cancelled" &&
+      !window.confirm(`Cancel order #${shortId(order)}?`)
+    )
+      return;
     if (
       status === "Confirmed" &&
-      !window.confirm("This sends a confirmation SMS to the customer. Continue?")
+      !window.confirm(
+        "This sends a confirmation SMS to the customer. Continue?",
+      )
     ) {
       return;
     }
@@ -84,11 +104,16 @@ export default function OrdersPage() {
         method: "PATCH",
         body: JSON.stringify({ status }),
       });
-      setOrders((prev) => prev.map((o) => (o._id === updated._id ? updated : o)));
+      setOrders((prev) =>
+        prev.map((o) => (o._id === updated._id ? updated : o)),
+      );
       setSelected((s) => (s && s._id === updated._id ? updated : s));
       flash(`Order #${shortId(updated)} → ${status}`);
     } catch (err) {
-      flash(err instanceof Error ? err.message : "Failed to update status", true);
+      flash(
+        err instanceof Error ? err.message : "Failed to update status",
+        true,
+      );
     } finally {
       setUpdatingId(null);
     }
@@ -112,7 +137,11 @@ export default function OrdersPage() {
     });
     setOrders((prev) =>
       prev.map((o) =>
-        o._id === res.order._id ? res.order : o._id === res.cancelled._id ? res.cancelled : o,
+        o._id === res.order._id
+          ? res.order
+          : o._id === res.cancelled._id
+            ? res.cancelled
+            : o,
       ),
     );
     setSelected((s) => (s && s._id === res.order._id ? res.order : s));
@@ -138,6 +167,12 @@ export default function OrdersPage() {
     setOrders((prev) => prev.map((o) => (o._id === updated._id ? updated : o)));
     setSelected((s) => (s && s._id === updated._id ? updated : s));
     flash(`Order #${shortId(updated)}: customer record updated`);
+  };
+  // courier booked / status refreshed (an empty message stays silent)
+  const applyCourier = (updated: Order, message: string) => {
+    setOrders((prev) => prev.map((o) => (o._id === updated._id ? updated : o)));
+    setSelected((s) => (s && s._id === updated._id ? updated : s));
+    if (message) flash(message);
   };
 
   const handleCreated = (order: Order) => {
@@ -171,7 +206,10 @@ export default function OrdersPage() {
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     return [...orders]
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      )
       .filter((o) => !preorderOnly || o.isPreorder)
       .filter((o) => filter === "All" || o.status === filter)
       .filter(
@@ -250,7 +288,10 @@ export default function OrdersPage() {
       </div>
 
       {error && (
-        <p role="alert" className="rounded-xl bg-red-500/10 p-3 text-sm text-red-600">
+        <p
+          role="alert"
+          className="rounded-xl bg-red-500/10 p-3 text-sm text-red-600"
+        >
           {error}
         </p>
       )}
@@ -261,7 +302,9 @@ export default function OrdersPage() {
           <Loader2 className="h-4 w-4 animate-spin" /> Loading orders…
         </div>
       ) : visible.length === 0 ? (
-        <p className="py-10 text-center text-muted-foreground">No orders found</p>
+        <p className="py-10 text-center text-muted-foreground">
+          No orders found
+        </p>
       ) : (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           {visible.map((order) => {
@@ -276,7 +319,9 @@ export default function OrdersPage() {
                 <div className="min-w-0 space-y-1.5">
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="font-semibold">{order.customerName}</h3>
-                    <span className="text-xs text-muted-foreground">#{shortId(order)}</span>
+                    <span className="text-xs text-muted-foreground">
+                      #{shortId(order)}
+                    </span>
                     <span
                       className={`text-xs font-semibold ${
                         area === "dhaka" ? "text-green-600" : "text-red-500"
@@ -321,7 +366,8 @@ export default function OrdersPage() {
                     </p>
                     {(order.advancePaid ?? 0) > 0 && (
                       <p className="text-xs font-semibold text-amber-700">
-                        Advance {money(order.advancePaid ?? 0)} · Collect {money(dueAmount(order))}
+                        Advance {money(order.advancePaid ?? 0)} · Collect{" "}
+                        {money(dueAmount(order))}
                       </p>
                     )}
                   </div>
@@ -329,7 +375,9 @@ export default function OrdersPage() {
                   <select
                     value={order.status}
                     disabled={updatingId === order._id}
-                    onChange={(e) => changeStatus(order, e.target.value as OrderStatus)}
+                    onChange={(e) =>
+                      changeStatus(order, e.target.value as OrderStatus)
+                    }
                     aria-label={`Status for order ${shortId(order)}`}
                     className={`h-9 rounded-lg border border-border px-3 text-sm font-medium disabled:opacity-50 ${
                       STATUS_BADGE[order.status] ?? ""
@@ -368,12 +416,16 @@ export default function OrdersPage() {
           onSaveAdvance={saveAdvance}
           onMerge={mergeOrders}
           onRiskChecked={applyUpdated}
+          onCourierUpdated={applyCourier}
         />
       )}
 
       {/* New order modal */}
       {newOpen && (
-        <NewOrderModal onClose={() => setNewOpen(false)} onCreated={handleCreated} />
+        <NewOrderModal
+          onClose={() => setNewOpen(false)}
+          onCreated={handleCreated}
+        />
       )}
 
       {/* Toast */}
