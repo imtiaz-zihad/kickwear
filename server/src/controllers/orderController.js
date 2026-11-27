@@ -834,22 +834,27 @@ exports.refreshRisk = async (req, res) => {
 // ✅ Admin: send this order to the courier (Steadfast) and mark it Shipped
 const COURIER_BOOKABLE = ["Confirmed", "Collecting"];
 
-// What the rider / packer should know about the jerseys
+
+// What the rider / packer should know about the jerseys.
+// Plain text only (commas, numbers, colons): Steadfast strips ; { } < > $ and
+// odd symbols can show up wrong on their side.
 const courierNote = (order) => {
-  const lines = order.items.map((i) =>
-    [
+  const parts = order.items.map((i, n) => {
+    const size = i.size || order.size;
+    const print = [i.customName, i.customNumber].filter(Boolean).join(" ");
+    const detail = [
       i.name,
-      (i.size || order.size) && `Size ${i.size || order.size}`,
-      `x${i.quantity}`,
+      size && `Size ${size}`,
+      `Qty ${i.quantity}`,
       i.uclPatch && "UCL patch",
-      (i.customName || i.customNumber) &&
-        `Print: ${[i.customName, i.customNumber].filter(Boolean).join(" ")}`,
+      print && `Print: ${print}`,
     ]
       .filter(Boolean)
-      .join(" | "),
-  );
-  if ((order.advancePaid || 0) > 0) lines.push(`Advance paid: ${order.advancePaid}`);
-  return lines.join("; ").slice(0, 480);
+      .join(", ");
+    return `${n + 1}) ${detail}.`;
+  });
+  if ((order.advancePaid || 0) > 0) parts.push(`Advance paid: ${order.advancePaid}.`);
+  return parts.join(" ").slice(0, 480);
 };
 
 exports.bookCourier = async (req, res) => {
