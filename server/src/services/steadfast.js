@@ -1,11 +1,4 @@
-// src/services/steadfast.js
-// Steadfast (Packzy) API: customer delivery record (fraud check) and parcel booking / status.
-//
-// Env variables on the server (Render):
-//   STEADFAST_API_KEY      from portal.packzy.com -> API keys
-//   STEADFAST_SECRET_KEY
-//   STEADFAST_BASE_URL     optional, default https://portal.packzy.com/api/v1
-// If the keys are missing, every check quietly returns null.
+
 const axios = require("axios");
 const { getCache, setCache } = require("../utils/cache");
 
