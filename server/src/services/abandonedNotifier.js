@@ -9,7 +9,7 @@ const AbandonedCheckout = require("../models/AbandonedCheckout");
 const Order = require("../models/Order");
 const { telegramReady, sendAbandoned } = require("./notify");
 
-const WAIT_MIN = 10; // quiet for this long = abandoned
+const WAIT_MIN = 3 ; // quiet for this long = abandoned
 const EVERY_MS = 2 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
