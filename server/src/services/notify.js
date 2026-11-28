@@ -6,9 +6,8 @@
 //   VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY   (npx web-push generate-vapid-keys)
 //   VAPID_SUBJECT                         (mailto:you@example.com)
 // If they are missing, this does nothing.
-const webpush = require("web-push");
 const axios = require("axios");
-
+const webpush = require("web-push");
 const PushSubscription = require("../models/PushSubscription");
 
 const money = (n) => `৳${Number(n || 0).toLocaleString("en-US")}`;
@@ -83,24 +82,13 @@ function orderPayload(order, risk) {
   };
 }
 
-// Never throws and is never awaited by the order flow
-// function notifyNewOrder(order, risk = null) {
-//   try {
-//     const payload = orderPayload(order, risk);
-//     sendToAll(payload)
-//       .then((n) => console.log(`Push ${payload.tag}: sent to ${n} device(s)`))
-//       .catch((err) => console.error("Notify failed:", err.message));
-//   } catch (err) {
-//     console.error("Notify skipped:", err.message);
-//   }
-// }
-
-
-
 // ───────────────────────── Telegram ─────────────────────────
 // Env on the server (Render):
-//   TELEGRAM_BOT_TOKEN   from @BotFather
+//   TELEGRAM_BOT_TOKEN   from @BotFather (new orders)
 //   TELEGRAM_CHAT_ID     one id, or several separated by commas (you, Zihad, a group)
+//   TELEGRAM_ABANDONED_BOT_TOKEN / TELEGRAM_ABANDONED_CHAT_ID
+//                        optional second bot for abandoned checkouts; if missing,
+//                        they use the two variables above
 //   ADMIN_URL            optional, e.g. https://kickwear.shop/admin/orders (adds a link)
 // If the first two are missing, this does nothing.
 const esc = (v) =>
@@ -142,12 +130,22 @@ function telegramText(order, risk) {
     .trim();
 }
 
-async function sendTelegram(text) {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chats = String(process.env.TELEGRAM_CHAT_ID || "")
+// Which bot and which chats to use. "abandoned" has its own bot when
+// TELEGRAM_ABANDONED_BOT_TOKEN is set, otherwise it shares the order bot.
+function telegramTarget(kind = "order") {
+  const env = process.env;
+  const own = kind === "abandoned";
+  const token = (own && env.TELEGRAM_ABANDONED_BOT_TOKEN) || env.TELEGRAM_BOT_TOKEN;
+  const raw = (own && env.TELEGRAM_ABANDONED_CHAT_ID) || env.TELEGRAM_CHAT_ID || "";
+  const chats = String(raw)
     .split(",")
     .map((c) => c.trim())
     .filter(Boolean);
+  return { token, chats };
+}
+
+async function sendTelegram(text, kind = "order") {
+  const { token, chats } = telegramTarget(kind);
   if (!token || chats.length === 0) return 0;
 
   let sent = 0;
@@ -162,32 +160,31 @@ async function sendTelegram(text) {
         sent++;
       } catch (err) {
         // never print the URL: it contains the bot token
-        console.error("Telegram failed:", err.response?.data?.description || err.message);
+        console.error(`Telegram (${kind}) failed:`, err.response?.data?.description || err.message);
       }
     }),
   );
   return sent;
 }
 
-// Never throws and is never awaited by the order flow
-function notifyNewOrder(order, risk = null) {
-  try {
-    const payload = orderPayload(order, risk);
-    sendToAll(payload)
-      .then((n) => console.log(`Push ${payload.tag}: sent to ${n} device(s)`))
-      .catch((err) => console.error("Notify failed:", err.message));
-  } catch (err) {
-    console.error("Notify skipped:", err.message);
-  }
+const telegramReady = (kind = "order") => {
+  const { token, chats } = telegramTarget(kind);
+  return Boolean(token && chats.length);
+};
 
-  try {
-    sendTelegram(telegramText(order, risk)).catch((err) =>
-      console.error("Telegram skipped:", err.message),
-    );
-  } catch (err) {
-    console.error("Telegram skipped:", err.message);
-  }
+// A customer who typed their phone at checkout but did not order. Returns chats reached.
+function abandonedText(lead) {
+  const area = lead.deliveryArea === "outside" ? "Outside Dhaka" : "Inside Dhaka";
+  const detail = [lead.size && `Size ${lead.size}`, `Qty ${lead.quantity || 1}`].filter(Boolean).join(", ");
+  return [
+    "🕒 <b>Abandoned checkout</b>",
+    "",
+    `👤 ${esc(lead.customerName || "(no name yet)")}`,
+    `📞 ${esc(lead.phone)}`,
+    lead.address ? `📍 ${esc(lead.address)} (${area})` : `📍 ${area}`,
+    "",
+    `${esc(lead.productName || "(product unknown)")} (${esc(detail)})`,
+    "",
+    `💬 WhatsApp: https://wa.me/88${esc(lead.phone)}`,
+  ].join("\n");
 }
-
-module.exports = { notifyNewOrder, sendToAll, isPushReady };
-

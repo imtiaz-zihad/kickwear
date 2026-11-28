@@ -21,6 +21,7 @@ const schema = new mongoose.Schema(
     note: { type: String, default: "", trim: true },
 
     lastSeenAt: { type: Date, default: Date.now },
+     notifiedAt: { type: Date, default: null },
   },
   { timestamps: true },
 );
