@@ -188,3 +188,29 @@ function abandonedText(lead) {
     `💬 WhatsApp: https://wa.me/88${esc(lead.phone)}`,
   ].join("\n");
 }
+
+function sendAbandoned(lead) {
+  return sendTelegram(abandonedText(lead), "abandoned");
+}
+
+// Never throws and is never awaited by the order flow
+function notifyNewOrder(order, risk = null) {
+  try {
+    const payload = orderPayload(order, risk);
+    sendToAll(payload)
+      .then((n) => console.log(`Push ${payload.tag}: sent to ${n} device(s)`))
+      .catch((err) => console.error("Notify failed:", err.message));
+  } catch (err) {
+    console.error("Notify skipped:", err.message);
+  }
+
+  try {
+    sendTelegram(telegramText(order, risk)).catch((err) =>
+      console.error("Telegram skipped:", err.message),
+    );
+  } catch (err) {
+    console.error("Telegram skipped:", err.message);
+  }
+}
+
+module.exports = { notifyNewOrder, sendToAll, isPushReady, telegramReady, sendAbandoned };

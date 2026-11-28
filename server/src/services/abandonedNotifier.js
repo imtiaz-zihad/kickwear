@@ -19,12 +19,13 @@ let running = false;
 
 async function sweep() {
   if (running) return;
-  if (!telegramReady("abandoned")) {
-    console.log("Abandoned sweep: Telegram bot/chat id not set, skipping");
-    return;
-  }
   running = true;
   try {
+    if (typeof telegramReady !== "function" || !telegramReady("abandoned")) {
+      console.log("Abandoned sweep: Telegram bot/chat id not set, skipping");
+      return;
+    }
+
     const now = Date.now();
     const leads = await AbandonedCheckout.find({
       notifiedAt: null,
