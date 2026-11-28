@@ -7,6 +7,8 @@
 //   VAPID_SUBJECT                         (mailto:you@example.com)
 // If they are missing, this does nothing.
 const webpush = require("web-push");
+const axios = require("axios");
+
 const PushSubscription = require("../models/PushSubscription");
 
 const money = (n) => `৳${Number(n || 0).toLocaleString("en-US")}`;
@@ -82,6 +84,92 @@ function orderPayload(order, risk) {
 }
 
 // Never throws and is never awaited by the order flow
+// function notifyNewOrder(order, risk = null) {
+//   try {
+//     const payload = orderPayload(order, risk);
+//     sendToAll(payload)
+//       .then((n) => console.log(`Push ${payload.tag}: sent to ${n} device(s)`))
+//       .catch((err) => console.error("Notify failed:", err.message));
+//   } catch (err) {
+//     console.error("Notify skipped:", err.message);
+//   }
+// }
+
+
+
+// ───────────────────────── Telegram ─────────────────────────
+// Env on the server (Render):
+//   TELEGRAM_BOT_TOKEN   from @BotFather
+//   TELEGRAM_CHAT_ID     one id, or several separated by commas (you, Zihad, a group)
+//   ADMIN_URL            optional, e.g. https://kickwear.shop/admin/orders (adds a link)
+// If the first two are missing, this does nothing.
+const esc = (v) =>
+  String(v ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+function telegramText(order, risk) {
+  const id = String(order._id).slice(-6).toUpperCase();
+  const lines = (order.items || []).map((i, n) => {
+    const size = i.size || order.size;
+    const print = [i.customName, i.customNumber].filter(Boolean).join(" ");
+    const detail = [size && `Size ${size}`, `Qty ${i.quantity}`, i.uclPatch && "UCL patch", print && `Print: ${print}`]
+      .filter(Boolean)
+      .join(", ");
+    return `${n + 1}) ${esc(i.name)} (${esc(detail)})`;
+  });
+
+  const area = order.deliveryArea === "dhaka" ? "Inside Dhaka" : "Outside Dhaka";
+  const advance = Number(order.advancePaid || 0);
+  const danger = risk && risk.level === "high" ? "⚠️ " : "";
+
+  return [
+    `${danger}🛒 <b>New order #${id}</b>${order.isPreorder ? " · <b>PRE-ORDER</b>" : ""}`,
+    "",
+    `👤 ${esc(order.customerName)}`,
+    `📞 ${esc(order.phone)}`,
+    `📍 ${esc(order.address)} (${area})`,
+    "",
+    ...lines,
+    "",
+    `💰 Total ${money(order.totalPrice)}${advance > 0 ? ` · advance ${money(advance)}` : ""}`,
+    esc(riskLine(risk)),
+    process.env.ADMIN_URL ? `\n${esc(process.env.ADMIN_URL)}` : "",
+  ]
+    .filter((l, i, a) => l !== "" || (a[i - 1] !== "" && i !== 0))
+    .join("\n")
+    .trim();
+}
+
+async function sendTelegram(text) {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const chats = String(process.env.TELEGRAM_CHAT_ID || "")
+    .split(",")
+    .map((c) => c.trim())
+    .filter(Boolean);
+  if (!token || chats.length === 0) return 0;
+
+  let sent = 0;
+  await Promise.all(
+    chats.map(async (chat) => {
+      try {
+        await axios.post(
+          `https://api.telegram.org/bot${token}/sendMessage`,
+          { chat_id: chat, text, parse_mode: "HTML", disable_web_page_preview: true },
+          { timeout: 8000 },
+        );
+        sent++;
+      } catch (err) {
+        // never print the URL: it contains the bot token
+        console.error("Telegram failed:", err.response?.data?.description || err.message);
+      }
+    }),
+  );
+  return sent;
+}
+
+// Never throws and is never awaited by the order flow
 function notifyNewOrder(order, risk = null) {
   try {
     const payload = orderPayload(order, risk);
@@ -91,6 +179,15 @@ function notifyNewOrder(order, risk = null) {
   } catch (err) {
     console.error("Notify skipped:", err.message);
   }
+
+  try {
+    sendTelegram(telegramText(order, risk)).catch((err) =>
+      console.error("Telegram skipped:", err.message),
+    );
+  } catch (err) {
+    console.error("Telegram skipped:", err.message);
+  }
 }
 
 module.exports = { notifyNewOrder, sendToAll, isPushReady };
+
